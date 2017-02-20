@@ -42,3 +42,56 @@ def symmetrize(partition):
             count_right += 1
 
     return sym_partition
+
+def create_random_permutations(partition,N):
+    """
+    Creates a list of N random permutations of the partition
+
+    :param partition: A list of integers.
+    :return partition_list: a list of N random permutations of partition (i.e. a list of lists)
+    """
+
+    partition_list = [np.ndarray.tolist(np.random.permutation(partition)) for j in range(N)]
+    return partition_list
+
+
+def compress_partition(partition, steps, step_size, sym=True):
+    """
+    Compresses a given partition.
+    Compresses from the outside in, by using a given number of steps, of a certain step size.
+    Each step multiplies together "step_size" entries of the partition to create a new entry.
+    If the partition cannot be compressed as requested, then the original partition is returned and a flag is raised.
+
+    :param partition: A list of integers.
+    :param steps: The number of steps (of size "step_size") to take in the compression process
+    :param step_size: The size of each compression step
+    :param sym: If "True" then the resulting partition is always symmetric
+    :return new_partition: The compressed partition (a list of integers)
+    :return compression_success: If "True" then the compression was possible and was executed.
+    """
+
+    partition_length = np.size(partition)
+    compression_success = True
+
+    if np.mod(partition_length, 2) == 0:
+        threshhold = partition_length / 2
+    else:
+        threshhold = (partition_length - 1) / 2
+
+    if step_size * steps > threshhold:
+        return partition, False
+    else:
+
+        new_length = partition_length - (step_size - 1) * 2 * steps
+        new_partition = [None] * (new_length)
+
+        for j in range(steps):
+            new_partition[j] = np.prod(partition[j * step_size:(j + 1) * step_size])
+            new_partition[new_length - 1 - j] = np.prod(partition[partition_length - (j + 1) * step_size:partition_length - j * step_size])
+
+        new_partition[steps:new_length - steps] = partition[steps * step_size:(partition_length - steps * step_size)]
+
+        if steps == 1 and sym:
+            new_partition = symmetrize(new_partition)
+
+        return new_partition, compression_success
