@@ -1,5 +1,6 @@
 import numpy as np
 from sympy import factorint
+import tncontract as tn
 
 def raw_partition(N):
     """
@@ -95,3 +96,29 @@ def compress_partition(partition, steps, step_size, sym=True):
             new_partition = symmetrize(new_partition)
 
         return new_partition, compression_success
+
+def full_partition(data):
+    """
+    Performs full virtual tensorization of a data matrix via the symmetrized raw partition.
+    This function also centers the batch_size_postition by default.
+
+    :param data: A matrix of data with rows as instances and features as columns.
+    :return data_tensor: A tensorized form of the data, tensorized via the symmetric raw partition.
+    :return batch_size_position: The position of the batch size index in the partition.
+    """
+
+    training_set_size = np.shape(data)[0]
+    pre_partition = symmetrize(raw_partition(np.shape(data)[1]))
+    partition = [training_set_size]
+    partition.extend(pre_partition)
+
+    tensor_labels = ["batchsize"]
+    tensor_labels.extend([str(j + 1) for j in range(np.size(pre_partition))])
+
+    num_cores = np.size(partition)
+    batch_size_position = int(round((num_cores - 1) / 2))
+
+    data_tensor = tn.matrix_to_tensor(data, partition, labels=tensor_labels)
+    data_tensor.move_index("batchsize", batch_size_position)
+
+    return data_tensor, batch_size_position
