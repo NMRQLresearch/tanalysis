@@ -49,7 +49,7 @@ def extract_core_tensor_via_common_features_from_matrix(data_matrix, left, right
     This version ensures that the partitioning of the test data matches up accordingly
     ---> it is preferable to use this over "extract_core_tensor_via_common_features"
 
-    :param data_tensor: The tensorized data that we want to be reduced via MCA. The partition must match the MCS.
+    :param data_matrix: The data matrix whose features we want extracted. Partition is extracted automatically.
     :param left: The list of left tensors from the previously obtained mixed canonical state
     :param right: The list of left tensors from the previously obtained mixed canonical state
     :return data-reduced: The extracted reduced data set

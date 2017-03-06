@@ -248,9 +248,6 @@ def mixed_canonical_full_core_truncation_only_no_diagnostics(data_tensor, core_b
     :return left: A list of left canonical 3-tensors from the left hand edge up to the core tensor.
     :return right: A list of right canonical 3-tensors from the right hand edge up to the core tensor.
     :return core: The core tensor of the mixed canonical MPS.
-    :return svd_thresholds: A list of the ratios of retained singular values to all singular values per bond.
-    :return original_bonds: a list of original bond dimensions before truncation
-    :return new_bond_percentage: a list of the ratios of truncated bond dimensions over original bond dimensions.
     """
 
     working_tensor = data_tensor.copy()
