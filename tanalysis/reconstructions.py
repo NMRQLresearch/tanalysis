@@ -53,8 +53,8 @@ def reconstruct_to_tensor(mps):
 
     return tensor_form
 
-def reconstruct_to_matrix(mps,batch_size_position):
 
+def reconstruct_to_matrix(mps,batch_size_position):
     """
     Reconstructs a data matrix from a MPS.
 
@@ -68,8 +68,8 @@ def reconstruct_to_matrix(mps,batch_size_position):
 
     return matrix_form
 
-def reconstruct_to_matrix_from_mc(left, right, core):
 
+def reconstruct_to_matrix_from_mc(left, right, core):
     """
     Reconstructs a data matrix from a mixed canonical MPS stored as three seperate lists (left, right, core)
 
@@ -84,3 +84,5 @@ def reconstruct_to_matrix_from_mc(left, right, core):
     matrix_form = reconstruct_to_matrix(mps,batch_size_position)
 
     return matrix_form
+
+
