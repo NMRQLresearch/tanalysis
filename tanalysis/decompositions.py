@@ -28,7 +28,7 @@ def truncated_svd(tensor, row_labels, chi=0, threshold=1e-15,
     :return new_bond_percentage: a list of the ratios of truncated bond dimensions over original bond dimensions.
     """
 
-    U, S, V = tensor_svd(tensor, row_labels)
+    U, S, V = tn.tensor_svd(tensor, row_labels)
 
     singular_values = np.diag(S.data)
 
@@ -62,16 +62,16 @@ def truncated_svd(tensor, row_labels, chi=0, threshold=1e-15,
     # or take the square root of S and absorb into both (default)
 
     if absorb_singular_values == "left":
-        U_new = contract(U, S, ["svd_in"], ["svd_out"])
+        U_new = tn.contract(U, S, ["svd_in"], ["svd_out"])
         V_new = V
     elif absorb_singular_values == "right":
-        V_new = contract(S, V, ["svd_in"], ["svd_out"])
+        V_new = tn.contract(S, V, ["svd_in"], ["svd_out"])
         U_new = U
     else:
         sqrtS = S.copy()
         sqrtS.data = np.sqrt(sqrtS.data)
-        U_new = contract(U, sqrtS, ["svd_in"], ["svd_out"])
-        V_new = contract(sqrtS, V, ["svd_in"], ["svd_out"])
+        U_new = tn.contract(U, sqrtS, ["svd_in"], ["svd_out"])
+        V_new = tn.contract(sqrtS, V, ["svd_in"], ["svd_out"])
 
     return U_new, V_new, svd_thresh, tot_svd, percent_cut
 
@@ -94,7 +94,7 @@ def truncated_svd_eff(tensor, row_labels, chi=0, threshold=1e-15,
     :return new_bond_percentage: a list of the ratios of truncated bond dimensions over original bond dimensions.
     """
 
-    U, S, V = tensor_svd(tensor, row_labels)
+    U, S, V = tn.tensor_svd(tensor, row_labels)
 
     singular_values = np.diag(S.data)
 
@@ -123,16 +123,16 @@ def truncated_svd_eff(tensor, row_labels, chi=0, threshold=1e-15,
     # Absorb singular values S into either V or U
 
     if absorb_singular_values == "left":
-        U_new = contract(U, S, ["svd_in"], ["svd_out"])
+        U_new = tn.contract(U, S, ["svd_in"], ["svd_out"])
         V_new = V
     elif absorb_singular_values == "right":
-        V_new = contract(S, V, ["svd_in"], ["svd_out"])
+        V_new = tn.contract(S, V, ["svd_in"], ["svd_out"])
         U_new = U
     else:
         sqrtS = S.copy()
         sqrtS.data = np.sqrt(sqrtS.data)
-        U_new = contract(U, sqrtS, ["svd_in"], ["svd_out"])
-        V_new = contract(sqrtS, V, ["svd_in"], ["svd_out"])
+        U_new = tn.contract(U, sqrtS, ["svd_in"], ["svd_out"])
+        V_new = tn.contract(sqrtS, V, ["svd_in"], ["svd_out"])
 
     return U_new, V_new
 
