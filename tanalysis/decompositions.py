@@ -5,15 +5,14 @@ from .reconstructions import *
 
 
 # --------------------------------------------------------------------------------------
-# The following two functions provide slightly modified versions of tncontract functions
+# The following three functions provide slightly modified versions of tncontract functions
 
-
-def truncated_svd(tensor, row_labels, chi=0, threshold=1e-15,
-                  absorb_singular_values="right", absolute=True):
+def truncated_svd_ret_sv(tensor, row_labels, chi=0, threshold=1e-15,
+                         absorb_singular_values="right", absolute=True):
     """
     This function overwrites tn.truncated_svd. It performs an svd of the given tensor, as per tn.tensor_svd,
     but then truncates according to both the specified maximum number of singular values and a relative
-    or absolute singular value threshold.
+    or absolute singular value threshold. This version returns both the original and retained singular values.
 
     :param tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param row_labels: The labels of the tensor which will be reshaped and joined into the matrix row index.
@@ -23,9 +22,8 @@ def truncated_svd(tensor, row_labels, chi=0, threshold=1e-15,
     :param absolute: Determines absolute or relative thresholding.
     :return U_new: The resulting truncated U matrix
     :return V_new: The resulting truncated V matrix.
-    :return svd_thresholds: A list of the ratios of retained singular values to all singular values per bond.
-    :return original_bonds: a list of original bond dimensions before truncation
-    :return new_bond_percentage: a list of the ratios of truncated bond dimensions over original bond dimensions.
+    :return singular_values: A list of all the original singular values.
+    :return singular_values_to_keep: a list of the retained singular values
     """
 
     U, S, V = tn.tensor_svd(tensor, row_labels)
@@ -46,10 +44,6 @@ def truncated_svd(tensor, row_labels, chi=0, threshold=1e-15,
     else:
         rel_thresh = singular_values[0] * threshold
         singular_values_to_keep = singular_values_to_keep[singular_values_to_keep > rel_thresh]
-
-    svd_thresh = np.sum(singular_values_to_keep) / float(np.sum(singular_values))
-    tot_svd = np.size(singular_values)
-    percent_cut = np.size(singular_values_to_keep) / float(tot_svd)
 
     S.data = np.diag(singular_values_to_keep)
 
@@ -73,13 +67,13 @@ def truncated_svd(tensor, row_labels, chi=0, threshold=1e-15,
         U_new = tn.contract(U, sqrtS, ["svd_in"], ["svd_out"])
         V_new = tn.contract(sqrtS, V, ["svd_in"], ["svd_out"])
 
-    return U_new, V_new, svd_thresh, tot_svd, percent_cut
+    return U_new, V_new, singular_values, singular_values_to_keep
 
 
 def truncated_svd_eff(tensor, row_labels, chi=0, threshold=1e-15,
                       absorb_singular_values="right", absolute=True):
     """
-    An efficient version of truncated_svd which does not return diagnostics.
+    An efficient version of truncated_svd which does not return singular values.
 
     :param tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param row_labels: The labels of the tensor which will be reshaped and joined into the matrix row index.
@@ -136,13 +130,14 @@ def truncated_svd_eff(tensor, row_labels, chi=0, threshold=1e-15,
 
     return U_new, V_new
 
+
 # ----------------------------------------------------------------------------------------------------
 
 
-def mixed_canonical_full_withdiagnostics(data_tensor, max_bond_dimension, batch_size_position):
+def mixed_canonical_ret_sv(data_tensor, max_bond_dimension, batch_size_position):
     """
     Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
-    Also provides some diagnostics concerning the truncation.
+    Also returns the singular values from the decomposition procedure.
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param max_bond_dimension: The maximum bond dimension of the output MPS.
@@ -150,9 +145,8 @@ def mixed_canonical_full_withdiagnostics(data_tensor, max_bond_dimension, batch_
     :return left: A list of left canonical 3-tensors from the left hand edge up to the core tensor.
     :return right: A list of right canonical 3-tensors from the right hand edge up to the core tensor.
     :return core: The core tensor of the mixed canonical MPS.
-    :return svd_thresholds: A list of the ratios of retained singular values to all singular values per bond.
-    :return original_bonds: a list of original bond dimensions before truncation
-    :return new_bond_percentage: a list of the ratios of truncated bond dimensions over original bond dimensions.
+    :return full_singular_values: A list of lists of singular values per bond, before truncation.
+    :return retained_singular_values: A list of lists of singular values per bond, after truncation
     """
 
     working_tensor = data_tensor.copy()
@@ -160,81 +154,74 @@ def mixed_canonical_full_withdiagnostics(data_tensor, max_bond_dimension, batch_
     left = [None] * (batch_size_position)
     right_count = num_cores - batch_size_position - 1
     right = [None] * (right_count)
-    svd_thresholds = [None] * (num_cores - 1)
-    original_bonds = [None] * (num_cores - 1)
-    new_bond_percentage = [None] * (num_cores - 1)
 
-    total_count_1 = 0
+    full_singular_values = [[] for k in range(num_cores - 1)]
+    retained_singular_values = [[] for k in range(num_cores - 1)]
+
     for j in range(batch_size_position):
 
         if j == 0:
 
-            left[j], working_tensor, svd_thresholds[total_count_1], original_bonds[total_count_1], new_bond_percentage[
-                total_count_1] = truncated_svd(working_tensor, [working_tensor.labels[0]], chi=max_bond_dimension)
+            left[j], working_tensor, full_singular_values[j], retained_singular_values[j] = truncated_svd_ret_sv(
+                working_tensor, [working_tensor.labels[0]], chi=max_bond_dimension)
 
             left[j].add_dummy_index("a", position=0)
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
             left[j].move_index("c", 2)
 
             working_tensor.replace_label("svd_out", "a")
-            total_count_1 += 1
 
         else:
 
-            left[j], working_tensor, svd_thresholds[total_count_1], original_bonds[total_count_1], new_bond_percentage[
-                total_count_1] = truncated_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]],
-                                                  chi=max_bond_dimension)
+            left[j], working_tensor, full_singular_values[j], retained_singular_values[j] = truncated_svd_ret_sv(
+                working_tensor, [working_tensor.labels[0], working_tensor.labels[1]], chi=max_bond_dimension)
 
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
             left[j].move_index("c", 2)
 
             working_tensor.replace_label("svd_out", "a")
-            total_count_1 += 1
 
-    total_count_2 = 0
     for j in range(right_count):
         ind = right_count - j - 1
+        ind_2 = num_cores - j - 2
 
         if j == 0:
 
-            working_tensor, right[ind], svd_thresholds[num_cores - 2 - total_count_2], original_bonds[
-                num_cores - 2 - total_count_2], \
-            new_bond_percentage[num_cores - 2 - total_count_2] = truncated_svd(working_tensor,
-                                                                                  [working_tensor.labels[k] for k in
-                                                                                   range(np.size(
-                                                                                       working_tensor.labels) - 1)],
-                                                                                  chi=max_bond_dimension,
-                                                                                  absorb_singular_values='left')
+            working_tensor, right[ind], full_singular_values[ind_2], retained_singular_values[
+                ind_2] = truncated_svd_ret_sv(
+                working_tensor,
+                [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 1)],
+                chi=max_bond_dimension,
+                absorb_singular_values='left')
+
             right[ind].add_dummy_index("b", position=1)
             right[ind].replace_label(["svd_out", right[ind].labels[2]], ["a", "c"])
 
             working_tensor.replace_label("svd_in", "b")
-            total_count_2 += 1
 
         else:
 
-            working_tensor, right[ind], svd_thresholds[num_cores - 2 - total_count_2], original_bonds[
-                num_cores - 2 - total_count_2], \
-            new_bond_percentage[num_cores - 2 - total_count_2] = truncated_svd(working_tensor,
-                                                                                  [working_tensor.labels[k] for k in
-                                                                                   range(np.size(
-                                                                                       working_tensor.labels) - 2)],
-                                                                                  chi=max_bond_dimension,
-                                                                                  absorb_singular_values='left')
+            working_tensor, right[ind], full_singular_values[ind_2], retained_singular_values[
+                ind_2] = truncated_svd_ret_sv(working_tensor,
+                                              [working_tensor.labels[k] for k in
+                                               range(np.size(
+                                                   working_tensor.labels) - 2)],
+                                              chi=max_bond_dimension,
+                                              absorb_singular_values='left')
+
             right[ind].replace_label(["svd_out", right[ind].labels[1]], ["a", "c"])
             right[ind].move_index("c", 2)
 
             working_tensor.replace_label("svd_in", "b")
-            total_count_2 += 1
 
     core = working_tensor.copy()
     core.replace_label(core.labels[1], "c")
     core.move_index("c", 2)
 
-    return left, right, core, svd_thresholds, original_bonds, new_bond_percentage
+    return left, right, core, full_singular_values, retained_singular_values
 
 
-def mixed_canonical_core_only_withdiagnostics(data_tensor, max_bond_dimension, batch_size_position):
+def mixed_canonical_core_only_ret_sv(data_tensor, max_bond_dimension, batch_size_position):
     """
     Performs a mixed canonical MPS decomposition of a pre-partitioned data tensor, and only stores the core tensor.
     Also provides some diagnostics concerning the truncation.
@@ -243,71 +230,62 @@ def mixed_canonical_core_only_withdiagnostics(data_tensor, max_bond_dimension, b
     :param max_bond_dimension: The maximum bond dimension of the output MPS.
     :param batch_size_position: The index number corresponding to the batch (training sample number) index.
     :return core: The core tensor of the mixed canonical MPS.
-    :return svd_thresholds: A list of the ratios of retained singular values to all singular values per bond.
-    :return original_bonds: a list of original bond dimensions before truncation
-    :return new_bond_percentage: a list of the ratios of truncated bond dimensions over original bond dimensions.
+    :return full_singular_values: A list of lists of singular values per bond, before truncation.
+    :return retained_singular_values: A list of lists of singular values per bond, after truncation
     """
 
     working_tensor = data_tensor.copy()
     num_cores = np.size(working_tensor.labels)
     right_count = num_cores - batch_size_position - 1
-    svd_thresholds = [None] * (num_cores - 1)
-    original_bonds = [None] * (num_cores - 1)
-    new_bond_percentage = [None] * (num_cores - 1)
 
-    total_count_1 = 0
+    full_singular_values = [[] for k in range(num_cores - 1)]
+    retained_singular_values = [[] for k in range(num_cores - 1)]
+
     for j in range(batch_size_position):
 
         if j == 0:
 
-            left, working_tensor, svd_thresholds[total_count_1], original_bonds[total_count_1], new_bond_percentage[
-                total_count_1] = truncated_svd(working_tensor, [working_tensor.labels[0]], chi=max_bond_dimension)
+            left, working_tensor, full_singular_values[j], retained_singular_values[j] = truncated_svd_ret_sv(
+                working_tensor, [working_tensor.labels[0]], chi=max_bond_dimension)
 
             working_tensor.replace_label("svd_out", "a")
-            total_count_1 += 1
 
         else:
 
-            left, working_tensor, svd_thresholds[total_count_1], original_bonds[total_count_1], new_bond_percentage[
-                total_count_1] = truncated_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]],
-                                                  chi=max_bond_dimension)
+            left, working_tensor, full_singular_values[j], retained_singular_values[j] = truncated_svd_ret_sv(
+                working_tensor, [working_tensor.labels[0], working_tensor.labels[1]], chi=max_bond_dimension)
 
             working_tensor.replace_label("svd_out", "a")
-            total_count_1 += 1
 
     for j in range(right_count):
+        ind_2 = num_cores - j - 2
 
         if j == 0:
 
-            working_tensor, right, svd_thresholds[total_count_1], original_bonds[total_count_1], \
-            new_bond_percentage[total_count_1] = truncated_svd(working_tensor,
-                                                                  [working_tensor.labels[k] for k in
-                                                                   range(np.size(
-                                                                       working_tensor.labels) - 1)],
-                                                                  chi=max_bond_dimension,
-                                                                  absorb_singular_values='left')
+            working_tensor, right, full_singular_values[ind_2], retained_singular_values[
+                ind_2] = truncated_svd_ret_sv(working_tensor,
+                        [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 1)],
+                         chi=max_bond_dimension,
+                         absorb_singular_values='left')
 
             working_tensor.replace_label("svd_in", "b")
-            total_count_1 += 1
 
         else:
 
-            working_tensor, right, svd_thresholds[total_count_1], original_bonds[total_count_1], \
-            new_bond_percentage[total_count_1] = truncated_svd(working_tensor,
-                                                                  [working_tensor.labels[k] for k in
-                                                                   range(np.size(
-                                                                       working_tensor.labels) - 2)],
-                                                                  chi=max_bond_dimension,
-                                                                  absorb_singular_values='left')
+            working_tensor, right, full_singular_values[ind_2], retained_singular_values[
+                ind_2] = truncated_svd_ret_sv(working_tensor,
+                        [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 2)],
+                         chi=max_bond_dimension,
+                         absorb_singular_values='left')
 
             working_tensor.replace_label("svd_in", "b")
-            total_count_1 += 1
+
 
     core = working_tensor.copy()
     core.replace_label(core.labels[1], "c")
     core.move_index("c", 2)
 
-    return core, svd_thresholds, original_bonds, new_bond_percentage
+    return core, full_singular_values, retained_singular_values
 
 
 def mixed_canonical_core_only_nodiagnostics(data_tensor, max_bond_dimension, batch_size_position):
@@ -330,7 +308,7 @@ def mixed_canonical_core_only_nodiagnostics(data_tensor, max_bond_dimension, bat
         if j == 0:
 
             left, working_tensor = truncated_svd_eff(working_tensor, [working_tensor.labels[0]],
-                                                        chi=max_bond_dimension)
+                                                     chi=max_bond_dimension)
 
             working_tensor.replace_label("svd_out", "a")
             total_count_1 += 1
@@ -338,8 +316,8 @@ def mixed_canonical_core_only_nodiagnostics(data_tensor, max_bond_dimension, bat
         else:
 
             left, working_tensor = truncated_svd_eff(working_tensor,
-                                                        [working_tensor.labels[0], working_tensor.labels[1]],
-                                                        chi=max_bond_dimension)
+                                                     [working_tensor.labels[0], working_tensor.labels[1]],
+                                                     chi=max_bond_dimension)
 
             working_tensor.replace_label("svd_out", "a")
             total_count_1 += 1
@@ -349,10 +327,10 @@ def mixed_canonical_core_only_nodiagnostics(data_tensor, max_bond_dimension, bat
         if j == 0:
 
             working_tensor, right = truncated_svd_eff(working_tensor, [working_tensor.labels[k] for k in
-                                                                          range(np.size(
-                                                                              working_tensor.labels) - 1)],
-                                                         chi=max_bond_dimension,
-                                                         absorb_singular_values='left')
+                                                                       range(np.size(
+                                                                           working_tensor.labels) - 1)],
+                                                      chi=max_bond_dimension,
+                                                      absorb_singular_values='left')
 
             working_tensor.replace_label("svd_in", "b")
             total_count_1 += 1
@@ -360,10 +338,10 @@ def mixed_canonical_core_only_nodiagnostics(data_tensor, max_bond_dimension, bat
         else:
 
             working_tensor, right = truncated_svd_eff(working_tensor, [working_tensor.labels[k] for k in
-                                                                          range(np.size(
-                                                                              working_tensor.labels) - 2)],
-                                                         chi=max_bond_dimension,
-                                                         absorb_singular_values='left')
+                                                                       range(np.size(
+                                                                           working_tensor.labels) - 2)],
+                                                      chi=max_bond_dimension,
+                                                      absorb_singular_values='left')
 
             working_tensor.replace_label("svd_in", "b")
             total_count_1 += 1
@@ -396,7 +374,7 @@ def mixed_canonical_full_core_truncation_only_no_diagnostics(data_tensor, core_b
 
     for j in range(batch_size_position):
 
-        if j == 0:
+        if j == 0 and j != (batch_size_position - 1):
 
             left[j], S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0]])
             left[j].add_dummy_index("a", position=0)
@@ -406,7 +384,18 @@ def mixed_canonical_full_core_truncation_only_no_diagnostics(data_tensor, core_b
             working_tensor = tn.contract(S, V, "svd_in", "svd_out")
             working_tensor.replace_label("svd_out", "a")
 
-        elif j == (batch_size_position - 1):
+        elif j == 0 and j == (batch_size_position - 1):
+
+            left[j], working_tensor = truncated_svd_eff(
+                working_tensor, [working_tensor.labels[0]], chi=core_bond_dimension)
+
+            left[j].add_dummy_index("a", position=0)
+            left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
+            left[j].move_index("c", 2)
+
+            working_tensor.replace_label("svd_out", "a")
+
+        elif j > 0 and j == (batch_size_position - 1):
 
             left[j], working_tensor = truncated_svd_eff(
                 working_tensor, [working_tensor.labels[0], working_tensor.labels[1]],
@@ -429,7 +418,7 @@ def mixed_canonical_full_core_truncation_only_no_diagnostics(data_tensor, core_b
     for j in range(right_count):
         ind = right_count - j - 1
 
-        if j == 0:
+        if j == 0 and j != (right_count - 1):
 
             U, S, right[ind] = tn.tensor_svd(working_tensor, [working_tensor.labels[k] for k in
                                                               range(np.size(working_tensor.labels) - 1)])
@@ -439,12 +428,24 @@ def mixed_canonical_full_core_truncation_only_no_diagnostics(data_tensor, core_b
             working_tensor = tn.contract(U, S, "svd_in", "svd_out")
             working_tensor.replace_label("svd_in", "b")
 
-        elif j == (right_count - 1):
+        elif j == 0 and j == (right_count - 1):
 
-            working_tensor, right[ind] = truncated_svd_eff(
-                working_tensor,
-                [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 2)],
-                chi=core_bond_dimension, absorb_singular_values='left')
+            working_tensor, right[ind] = truncated_svd_eff(working_tensor,
+                                                           [working_tensor.labels[k] for k in
+                                                            range(np.size(working_tensor.labels) - 1)],
+                                                           chi=core_bond_dimension, absorb_singular_values='left')
+
+            right[ind].add_dummy_index("b", position=1)
+            right[ind].replace_label(["svd_out", right[ind].labels[2]], ["a", "c"])
+
+            working_tensor.replace_label("svd_in", "b")
+
+        elif j > 0 and j == (right_count - 1):
+
+            working_tensor, right[ind] = truncated_svd_eff(working_tensor,
+                                                           [working_tensor.labels[k] for k in
+                                                            range(np.size(working_tensor.labels) - 2)],
+                                                           chi=core_bond_dimension, absorb_singular_values='left')
 
             right[ind].replace_label(["svd_out", right[ind].labels[1]], ["a", "c"])
             right[ind].move_index("c", 2)
@@ -468,11 +469,11 @@ def mixed_canonical_full_core_truncation_only_no_diagnostics(data_tensor, core_b
     return left, right, core
 
 
-def mixed_canonical_full_core_truncation_only_with_diagnostics(data_tensor, core_bond_dimension, batch_size_position):
+def mixed_canonical_full_core_truncation_only_ret_sv(data_tensor, core_bond_dimension, batch_size_position):
     """
     Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
     Only truncation of the core tensor bonds is performed.
-    Also provides diagnostics regarding the truncation.
+    Also provides the singular values (both retained and full) from the decomposition procedure.
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param core_bond_dimension: The bond dimension of the output core tensor.
@@ -480,9 +481,8 @@ def mixed_canonical_full_core_truncation_only_with_diagnostics(data_tensor, core
     :return left: A list of left canonical 3-tensors from the left hand edge up to the core tensor.
     :return right: A list of right canonical 3-tensors from the right hand edge up to the core tensor.
     :return core: The core tensor of the mixed canonical MPS.
-    :return svd_thresholds: A list of the ratios of retained singular values to all singular values per bond.
-    :return original_bonds: a list of original bond dimensions before truncation
-    :return new_bond_percentage: a list of the ratios of truncated bond dimensions over original bond dimensions.
+    :return full_singular_values: A list of lists of singular values per bond, before truncation.
+    :return retained_singular_values: A list of lists of singular values per bond, after truncation
     """
 
     working_tensor = data_tensor.copy()
@@ -491,25 +491,38 @@ def mixed_canonical_full_core_truncation_only_with_diagnostics(data_tensor, core
     right_count = num_cores - batch_size_position - 1
     right = [None] * (right_count)
 
-    svd_thresholds = [0, 0]
-    original_bonds = [0, 0]
-    new_bond_percentage = [0, 0]
+    full_singular_values = [[] for k in range(num_cores - 1)]
+    retained_singular_values = [[] for k in range(num_cores - 1)]
 
     for j in range(batch_size_position):
 
-        if j == 0:
+        if j == 0 and j != (batch_size_position - 1):
 
             left[j], S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0]])
             left[j].add_dummy_index("a", position=0)
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
             left[j].move_index("c", 2)
 
+            full_singular_values[j] = np.diag(S.data)
+            retained_singular_values[j] = np.diag(S.data)
+
             working_tensor = tn.contract(S, V, "svd_in", "svd_out")
             working_tensor.replace_label("svd_out", "a")
 
-        elif j == (batch_size_position - 1):
+        elif j == 0 and j == (batch_size_position - 1):
 
-            left[j], working_tensor, svd_thresholds[0], original_bonds[0], new_bond_percentage[0] = truncated_svd(
+            left[j], working_tensor, full_singular_values[j], retained_singular_values[j] = truncated_svd_ret_sv(
+                working_tensor, [working_tensor.labels[0]], chi=core_bond_dimension)
+
+            left[j].add_dummy_index("a", position=0)
+            left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
+            left[j].move_index("c", 2)
+
+            working_tensor.replace_label("svd_out", "a")
+
+        elif j > 0 and j == (batch_size_position - 1):
+
+            left[j], working_tensor, full_singular_values[j], retained_singular_values[j] = truncated_svd_ret_sv(
                 working_tensor, [working_tensor.labels[0], working_tensor.labels[1]],
                 chi=core_bond_dimension)
 
@@ -524,28 +537,47 @@ def mixed_canonical_full_core_truncation_only_with_diagnostics(data_tensor, core
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
             left[j].move_index("c", 2)
 
+            full_singular_values[j] = np.diag(S.data)
+            retained_singular_values[j] = np.diag(S.data)
+
             working_tensor = tn.contract(S, V, "svd_in", "svd_out")
             working_tensor.replace_label("svd_out", "a")
 
     for j in range(right_count):
         ind = right_count - j - 1
+        ind_2 = num_cores - j - 2
 
-        if j == 0:
+        if j == 0 and j != (right_count - 1):
 
             U, S, right[ind] = tn.tensor_svd(working_tensor, [working_tensor.labels[k] for k in
                                                               range(np.size(working_tensor.labels) - 1)])
             right[ind].add_dummy_index("b", position=1)
             right[ind].replace_label(["svd_out", right[ind].labels[2]], ["a", "c"])
 
+            full_singular_values[ind_2] = np.diag(S.data)
+            retained_singular_values[ind_2] = np.diag(S.data)
+
             working_tensor = tn.contract(U, S, "svd_in", "svd_out")
             working_tensor.replace_label("svd_in", "b")
 
-        elif j == (right_count - 1):
+        elif j == 0 and j == (right_count - 1):
 
-            working_tensor, right[ind], svd_thresholds[1], original_bonds[1], new_bond_percentage[1] = truncated_svd(
-                working_tensor,
-                [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 2)],
-                chi=core_bond_dimension, absorb_singular_values='left')
+            working_tensor, right[ind], full_singular_values[ind_2], retained_singular_values[ind_2] = \
+                truncated_svd_ret_sv(working_tensor,
+                                     [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 1)],
+                                     chi=core_bond_dimension, absorb_singular_values='left')
+
+            right[ind].add_dummy_index("b", position=1)
+            right[ind].replace_label(["svd_out", right[ind].labels[2]], ["a", "c"])
+
+            working_tensor.replace_label("svd_in", "b")
+
+        elif j > 0 and j == (right_count - 1):
+
+            working_tensor, right[ind], full_singular_values[ind_2], retained_singular_values[ind_2] = \
+                truncated_svd_ret_sv(working_tensor,
+                                     [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 2)],
+                                     chi=core_bond_dimension, absorb_singular_values='left')
             right[ind].replace_label(["svd_out", right[ind].labels[1]], ["a", "c"])
             right[ind].move_index("c", 2)
 
@@ -558,6 +590,9 @@ def mixed_canonical_full_core_truncation_only_with_diagnostics(data_tensor, core
             right[ind].replace_label(["svd_out", right[ind].labels[1]], ["a", "c"])
             right[ind].move_index("c", 2)
 
+            full_singular_values[ind_2] = np.diag(S.data)
+            retained_singular_values[ind_2] = np.diag(S.data)
+
             working_tensor = tn.contract(U, S, "svd_in", "svd_out")
             working_tensor.replace_label("svd_in", "b")
 
@@ -565,7 +600,7 @@ def mixed_canonical_full_core_truncation_only_with_diagnostics(data_tensor, core
     core.replace_label(core.labels[1], "c")
     core.move_index("c", 2)
 
-    return left, right, core, svd_thresholds, original_bonds, new_bond_percentage
+    return left, right, core, full_singular_values, retained_singular_values
 
 
 def mixed_canonical_core_only_core_truncation_only_no_diagnostics(data_tensor, core_bond_dimension,
@@ -584,16 +619,22 @@ def mixed_canonical_core_only_core_truncation_only_no_diagnostics(data_tensor, c
     num_cores = np.size(working_tensor.labels)
     right_count = num_cores - batch_size_position - 1
 
-    for j in range(batch_size_position):  # This does a conventional LN up to the designated spot
+    for j in range(batch_size_position):
 
-        if j == 0:
+        if j == 0 and j != (batch_size_position - 1):
 
             U, S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0]])
 
             working_tensor = tn.contract(S, V, "svd_in", "svd_out")
             working_tensor.replace_label("svd_out", "a")
 
-        elif j == (batch_size_position - 1):
+        elif j == 0 and j == (batch_size_position - 1):
+
+            U, working_tensor = truncated_svd_eff(working_tensor, [working_tensor.labels[0]], chi=core_bond_dimension)
+
+            working_tensor.replace_label("svd_out", "a")
+
+        elif j > 0 and j == (batch_size_position - 1):
 
             U, working_tensor = truncated_svd_eff(working_tensor, [
                 working_tensor.labels[0], working_tensor.labels[1]], chi=core_bond_dimension)
@@ -608,9 +649,8 @@ def mixed_canonical_core_only_core_truncation_only_no_diagnostics(data_tensor, c
             working_tensor.replace_label("svd_out", "a")
 
     for j in range(right_count):
-        ind = right_count - j - 1
 
-        if j == 0:
+        if j == 0 and j != (right_count - 1):
 
             U, S, V = tn.tensor_svd(working_tensor,
                                     [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 1)])
@@ -618,12 +658,21 @@ def mixed_canonical_core_only_core_truncation_only_no_diagnostics(data_tensor, c
             working_tensor = tn.contract(U, S, "svd_in", "svd_out")
             working_tensor.replace_label("svd_in", "b")
 
-        elif j == (right_count - 1):
+        elif j == 0 and j == (right_count - 1):
+
+            working_tensor, V = truncated_svd_eff(working_tensor, [working_tensor.labels[k] for k in range(
+                np.size(working_tensor.labels) - 1)],
+                                                  chi=core_bond_dimension,
+                                                  absorb_singular_values='left')
+
+            working_tensor.replace_label("svd_in", "b")
+
+        elif j > 0 and j == (right_count - 1):
 
             working_tensor, V = truncated_svd_eff(working_tensor, [working_tensor.labels[k] for k in range(
                 np.size(working_tensor.labels) - 2)],
-                                                     chi=core_bond_dimension,
-                                                     absorb_singular_values='left')
+                                                  chi=core_bond_dimension,
+                                                  absorb_singular_values='left')
 
             working_tensor.replace_label("svd_in", "b")
 
@@ -649,7 +698,7 @@ def core_compression(data_matrix, maximum_bond_dimension):
     The new representation has maximum_bond_dimension^2 number of features.
 
     :param data_matrix: A data array with rows as instances and columns as features
-    :param max_bond_dimension: The maximum bond dimension of the output MPS.
+    :param maximum_bond_dimension: The maximum bond dimension of the output MPS.
     :return data_compressed: A compressed representation of the initial data array.
     """
 
@@ -725,7 +774,7 @@ def left_canonical_decompose_no_diagnostics(data_tensor, max_bond_dimension):
 
         if j == 0:
             left[j], working_tensor = truncated_svd_eff(working_tensor, [working_tensor.labels[0]],
-                                                           chi=max_bond_dimension)
+                                                        chi=max_bond_dimension)
             left[j].add_dummy_index("a", position=0)
 
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
@@ -736,8 +785,8 @@ def left_canonical_decompose_no_diagnostics(data_tensor, max_bond_dimension):
         else:
 
             left[j], working_tensor = truncated_svd_eff(working_tensor,
-                                                           [working_tensor.labels[0], working_tensor.labels[1]],
-                                                           chi=max_bond_dimension)
+                                                        [working_tensor.labels[0], working_tensor.labels[1]],
+                                                        chi=max_bond_dimension)
 
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
             left[j].move_index("c", 2)
