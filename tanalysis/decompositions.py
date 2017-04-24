@@ -5,7 +5,7 @@ from .reconstructions import *
 
 
 # --------------------------------------------------------------------------------------
-# The following three functions provide slightly modified versions of tncontract functions
+# The following two functions provide slightly modified versions of tncontract functions
 
 def truncated_svd_ret_sv(tensor, row_labels, chi=0, threshold=1e-15,
                          absorb_singular_values="right", absolute=True):
@@ -134,7 +134,84 @@ def truncated_svd_eff(tensor, row_labels, chi=0, threshold=1e-15,
 # ----------------------------------------------------------------------------------------------------
 
 
-def mixed_canonical_ret_sv(data_tensor, max_bond_dimension, batch_size_position):
+def mixed_canonical_full(data_tensor, max_bond_dimension, batch_size_position):
+    """
+    Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
+
+    :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
+    :param max_bond_dimension: The maximum bond dimension of the output MPS.
+    :param batch_size_position: The index number corresponding to the batch (training sample number) index.
+    :return left: A list of left canonical 3-tensors from the left hand edge up to the core tensor.
+    :return right: A list of right canonical 3-tensors from the right hand edge up to the core tensor.
+    :return core: The core tensor of the mixed canonical MPS.
+    """
+
+    working_tensor = data_tensor.copy()
+    num_cores = np.size(working_tensor.labels)
+    left = [None] * (batch_size_position)
+    right_count = num_cores - batch_size_position - 1
+    right = [None] * (right_count)
+
+    for j in range(batch_size_position):
+
+        if j == 0:
+
+            left[j], working_tensor = truncated_svd_eff(
+                working_tensor, [working_tensor.labels[0]], chi=max_bond_dimension)
+
+            left[j].add_dummy_index("a", position=0)
+            left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
+            left[j].move_index("c", 2)
+
+            working_tensor.replace_label("svd_out", "a")
+
+        else:
+
+            left[j], working_tensor = truncated_svd_eff(
+                working_tensor, [working_tensor.labels[0], working_tensor.labels[1]], chi=max_bond_dimension)
+
+            left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
+            left[j].move_index("c", 2)
+
+            working_tensor.replace_label("svd_out", "a")
+
+    for j in range(right_count):
+        ind = right_count - j - 1
+
+        if j == 0:
+
+            working_tensor, right[ind] = truncated_svd_eff(working_tensor,
+                [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 1)],
+                chi=max_bond_dimension,
+                absorb_singular_values='left')
+
+            right[ind].add_dummy_index("b", position=1)
+            right[ind].replace_label(["svd_out", right[ind].labels[2]], ["a", "c"])
+
+            working_tensor.replace_label("svd_in", "b")
+
+        else:
+
+            working_tensor, right[ind] = truncated_svd_eff(working_tensor,
+                                              [working_tensor.labels[k] for k in
+                                               range(np.size(
+                                                   working_tensor.labels) - 2)],
+                                              chi=max_bond_dimension,
+                                              absorb_singular_values='left')
+
+            right[ind].replace_label(["svd_out", right[ind].labels[1]], ["a", "c"])
+            right[ind].move_index("c", 2)
+
+            working_tensor.replace_label("svd_in", "b")
+
+    core = working_tensor.copy()
+    core.replace_label(core.labels[1], "c")
+    core.move_index("c", 2)
+
+    return left, right, core
+
+
+def mixed_canonical_full_ret_sv(data_tensor, max_bond_dimension, batch_size_position):
     """
     Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
     Also returns the singular values from the decomposition procedure.
@@ -288,7 +365,7 @@ def mixed_canonical_core_only_ret_sv(data_tensor, max_bond_dimension, batch_size
     return core, full_singular_values, retained_singular_values
 
 
-def mixed_canonical_core_only_nodiagnostics(data_tensor, max_bond_dimension, batch_size_position):
+def mixed_canonical_core_only(data_tensor, max_bond_dimension, batch_size_position):
     """
     Performs a mixed canonical MPS decomposition of a pre-partitioned data tensor, and only stores the core tensor.
 
@@ -353,7 +430,7 @@ def mixed_canonical_core_only_nodiagnostics(data_tensor, max_bond_dimension, bat
     return core
 
 
-def mixed_canonical_full_core_truncation_only_no_diagnostics(data_tensor, core_bond_dimension, batch_size_position):
+def mixed_canonical_full_core_truncation_only(data_tensor, core_bond_dimension, batch_size_position):
     """
     Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
     Only truncation of the core tensor bonds is performed
@@ -603,8 +680,7 @@ def mixed_canonical_full_core_truncation_only_ret_sv(data_tensor, core_bond_dime
     return left, right, core, full_singular_values, retained_singular_values
 
 
-def mixed_canonical_core_only_core_truncation_only_no_diagnostics(data_tensor, core_bond_dimension,
-                                                                  batch_size_position):
+def mixed_canonical_core_only_core_truncation_only(data_tensor, core_bond_dimension, batch_size_position):
     """
     Performs a mixed canonical MPS decomposition of a pre-partitioned data tensor, and only stores the core tensor.
     Only the bonds directly attached to the core tensor are truncated.
@@ -691,6 +767,112 @@ def mixed_canonical_core_only_core_truncation_only_no_diagnostics(data_tensor, c
     return core
 
 
+def mixed_canonical_core_only_core_truncation_only_ret_sv(data_tensor, core_bond_dimension, batch_size_position):
+    """
+    Performs a mixed canonical MPS decomposition of a pre-partitioned data tensor, and only stores the core tensor.
+    Only the bonds directly attached to the core tensor are truncated.
+
+    :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
+    :param core_bond_dimension: The bond dimension of the output core tensor.
+    :param batch_size_position: The index number corresponding to the batch (training sample number) index.
+    :return core: The core tensor of the mixed canonical MPS.
+    :return full_singular_values: A list of lists of singular values per bond, before truncation.
+    :return retained_singular_values: A list of lists of singular values per bond, after truncation
+    """
+
+    working_tensor = data_tensor.copy()
+    num_cores = np.size(working_tensor.labels)
+    right_count = num_cores - batch_size_position - 1
+
+    full_singular_values = [[] for k in range(num_cores - 1)]
+    retained_singular_values = [[] for k in range(num_cores - 1)]
+
+    for j in range(batch_size_position):
+
+        if j == 0 and j != (batch_size_position - 1):
+
+            U, S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0]])
+
+            full_singular_values[j] = np.diag(S.data)
+            retained_singular_values[j] = np.diag(S.data)
+
+            working_tensor = tn.contract(S, V, "svd_in", "svd_out")
+            working_tensor.replace_label("svd_out", "a")
+
+        elif j == 0 and j == (batch_size_position - 1):
+
+            U, working_tensor, full_singular_values[j], retained_singular_values[j] = truncated_svd_ret_sv(
+                working_tensor, [working_tensor.labels[0]], chi=core_bond_dimension)
+
+            working_tensor.replace_label("svd_out", "a")
+
+        elif j > 0 and j == (batch_size_position - 1):
+
+            U, working_tensor, full_singular_values[j], retained_singular_values[j] = truncated_svd_ret_sv(
+                working_tensor, [working_tensor.labels[0], working_tensor.labels[1]], chi=core_bond_dimension)
+
+            working_tensor.replace_label("svd_out", "a")
+
+        else:
+
+            U, S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
+
+            full_singular_values[j] = np.diag(S.data)
+            retained_singular_values[j] = np.diag(S.data)
+
+            working_tensor = tn.contract(S, V, "svd_in", "svd_out")
+            working_tensor.replace_label("svd_out", "a")
+
+    for j in range(right_count):
+        ind_2 = num_cores - j - 2
+
+        if j == 0 and j != (right_count - 1):
+
+            U, S, V = tn.tensor_svd(working_tensor,
+                                    [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 1)])
+
+            full_singular_values[ind_2] = np.diag(S.data)
+            retained_singular_values[ind_2] = np.diag(S.data)
+
+            working_tensor = tn.contract(U, S, "svd_in", "svd_out")
+            working_tensor.replace_label("svd_in", "b")
+
+        elif j == 0 and j == (right_count - 1):
+
+            working_tensor, V, full_singular_values[ind_2], retained_singular_values[ind_2] = truncated_svd_ret_sv(
+                working_tensor, [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 1)],
+                chi=core_bond_dimension,
+                absorb_singular_values='left')
+
+            working_tensor.replace_label("svd_in", "b")
+
+        elif j > 0 and j == (right_count - 1):
+
+            working_tensor, V, full_singular_values[ind_2], retained_singular_values[ind_2] = truncated_svd_ret_sv(
+                working_tensor, [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 2)],
+                chi=core_bond_dimension,
+                absorb_singular_values='left')
+
+            working_tensor.replace_label("svd_in", "b")
+
+        else:
+
+            U, S, V = tn.tensor_svd(working_tensor,
+                                    [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 2)])
+
+            full_singular_values[ind_2] = np.diag(S.data)
+            retained_singular_values[ind_2] = np.diag(S.data)
+
+            working_tensor = tn.contract(U, S, "svd_in", "svd_out")
+            working_tensor.replace_label("svd_in", "b")
+
+    core = working_tensor.copy()
+    core.replace_label(core.labels[1], "c")
+    core.move_index("c", 2)
+
+    return core, full_singular_values, retained_singular_values
+
+
 def core_compression(data_matrix, maximum_bond_dimension):
     """
     Performs dimensionality reduction by extracting the core of a mixed canonical representation of the data tensor.
@@ -717,7 +899,7 @@ def core_compression(data_matrix, maximum_bond_dimension):
     data_tensor = tn.matrix_to_tensor(data_matrix, partition, labels=tensor_labels)
     data_tensor.move_index("batchsize", batch_size_position)
 
-    core_tensor = mixed_canonical_core_only_nodiagnostics(data_tensor, maximum_bond_dimension, batch_size_position)
+    core_tensor = mixed_canonical_core_only(data_tensor, maximum_bond_dimension, batch_size_position)
     data_compressed = tn.tensor_to_matrix(core_tensor, "c")
 
     return data_compressed
@@ -750,8 +932,9 @@ def core_compression_core_truncation_only(data_matrix, maximum_bond_dimension):
     data_tensor = tn.matrix_to_tensor(data_matrix, partition, labels=tensor_labels)
     data_tensor.move_index("batchsize", batch_size_position)
 
-    core_tensor = mixed_canonical_core_only_core_truncation_only_no_diagnostics(data_tensor, maximum_bond_dimension,
-                                                                                batch_size_position)
+    core_tensor = mixed_canonical_core_only_core_truncation_only(data_tensor,
+                                                                 maximum_bond_dimension,
+                                                                 batch_size_position)
     data_compressed = tn.tensor_to_matrix(core_tensor, "c")
 
     return data_compressed
@@ -812,7 +995,7 @@ def single_vector_individual_left_canonical_mps_compression(feature_vector, part
     :param partition: The partition according to which the decompostion should be performed.
     :param labels: The labels of the partition. This is required for tensorization.
     :param max_bond_dimension: maximum bond dimension of the decomposition
-    :return feature_mps: The MPS representing the image
+    :return feature_mps: The MPS representing the feature vector
     """
 
     feature_tensor = tn.matrix_to_tensor(feature_vector, partition, labels=labels)
@@ -830,7 +1013,7 @@ def single_vector_individual_left_canonical_mps_compression_with_reconstruction(
     :param partition: The partition according to which the decompostion should be performed.
     :param labels: The labels of the partition. This is required for tensorization.
     :param max_bond_dimension: maximum bond dimension of the decomposition
-    :return feature_compressed_vector: The mps representing the image
+    :return feature_compressed_vector: The mps representing the feature vector
     """
 
     feature_mps = single_vector_individual_left_canonical_mps_compression(feature_vector, partition, labels,
@@ -847,7 +1030,7 @@ def full_dataset_individual_left_canonical_mps_compression_with_reconstruction(a
      of every vector within a dataset.
 
     :param all_data: A matrix with each row a different instance/vector of feature values
-    :param partition: The partition according to which the decompostion should be performed.
+    :param partition: The partition according to which the decomposition should be performed.
     :param max_bond_dimension: maximum bond dimension of the decomposition
     :return compressed_data: A matrix with each row corresponding to the reconstructed compressed row of all_data
     """
