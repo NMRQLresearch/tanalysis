@@ -133,6 +133,94 @@ def truncated_svd_eff(tensor, row_labels, chi=0, threshold=1e-15,
 
 # ----------------------------------------------------------------------------------------------------
 
+def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
+    """
+    Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
+    No truncation of any of the bonds is performed.
+    Also provides the singular values (both retained and full) from the decomposition procedure.
+
+    :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
+    :param core_bond_dimension: The bond dimension of the output core tensor.
+    :param batch_size_position: The index number corresponding to the batch (training sample number) index.
+    :return left: A list of left canonical 3-tensors from the left hand edge up to the core tensor.
+    :return right: A list of right canonical 3-tensors from the right hand edge up to the core tensor.
+    :return core: The core tensor of the mixed canonical MPS.
+    :return full_singular_values: A list of lists of singular values per bond, before truncation.
+    :return retained_singular_values: A list of lists of singular values per bond, after truncation
+    """
+
+    working_tensor = data_tensor.copy()
+    num_cores = np.size(working_tensor.labels)
+    left = [None] * (batch_size_position)
+    right_count = num_cores - batch_size_position - 1
+    right = [None] * (right_count)
+
+    full_singular_values = [[] for k in range(num_cores - 1)]
+    retained_singular_values = [[] for k in range(num_cores - 1)]
+
+    for j in range(batch_size_position):
+
+        if j == 0:
+
+            left[j], S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0]])
+            left[j].add_dummy_index("a", position=0)
+            left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
+            left[j].move_index("c", 2)
+
+            full_singular_values[j] = np.diag(S.data)
+            retained_singular_values[j] = np.diag(S.data)
+
+            working_tensor = tn.contract(S, V, "svd_in", "svd_out")
+            working_tensor.replace_label("svd_out", "a")
+
+        else:
+
+            left[j], S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
+            left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
+            left[j].move_index("c", 2)
+
+            full_singular_values[j] = np.diag(S.data)
+            retained_singular_values[j] = np.diag(S.data)
+
+            working_tensor = tn.contract(S, V, "svd_in", "svd_out")
+            working_tensor.replace_label("svd_out", "a")
+
+    for j in range(right_count):
+        ind = right_count - j - 1
+        ind_2 = num_cores - j - 2
+
+        if j == 0:
+
+            U, S, right[ind] = tn.tensor_svd(working_tensor, [working_tensor.labels[k] for k in
+                                                              range(np.size(working_tensor.labels) - 1)])
+            right[ind].add_dummy_index("b", position=1)
+            right[ind].replace_label(["svd_out", right[ind].labels[2]], ["a", "c"])
+
+            full_singular_values[ind_2] = np.diag(S.data)
+            retained_singular_values[ind_2] = np.diag(S.data)
+
+            working_tensor = tn.contract(U, S, "svd_in", "svd_out")
+            working_tensor.replace_label("svd_in", "b")
+
+        else:
+
+            U, S, right[ind] = tn.tensor_svd(working_tensor, [working_tensor.labels[k] for k in
+                                                              range(np.size(working_tensor.labels) - 2)])
+            right[ind].replace_label(["svd_out", right[ind].labels[1]], ["a", "c"])
+            right[ind].move_index("c", 2)
+
+            full_singular_values[ind_2] = np.diag(S.data)
+            retained_singular_values[ind_2] = np.diag(S.data)
+
+            working_tensor = tn.contract(U, S, "svd_in", "svd_out")
+            working_tensor.replace_label("svd_in", "b")
+
+    core = working_tensor.copy()
+    core.replace_label(core.labels[1], "c")
+    core.move_index("c", 2)
+
+    return left, right, core, full_singular_values, retained_singular_values
+
 
 def mixed_canonical_full(data_tensor, max_bond_dimension, batch_size_position):
     """
