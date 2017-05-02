@@ -997,7 +997,7 @@ def core_compression_core_truncation_only(data_matrix, maximum_bond_dimension):
     """
     Performs dimensionality reduction by extracting the core of a mixed canonical representation of the data tensor.
     In this implementation the data tensor is partitioned via the longest possible prime partition.
-    The new representation has maximum_bond_dimension^2 number of features.
+    The new representation has at most maximum_bond_dimension^2 number of features.
     This "core truncation only" version of "core_compression" truncates only the bonds attached to the core tensor
 
     :param data_matrix: A data array with rows as instances and columns as features
@@ -1013,6 +1013,40 @@ def core_compression_core_truncation_only(data_matrix, maximum_bond_dimension):
 
     tensor_labels = ["batchsize"]
     tensor_labels.extend([str(j + 1) for j in range(np.size(pre_partition))])
+
+    num_cores = np.size(partition)
+    batch_size_position = int(round((num_cores - 1) / 2))
+
+    data_tensor = tn.matrix_to_tensor(data_matrix, partition, labels=tensor_labels)
+    data_tensor.move_index("batchsize", batch_size_position)
+
+    core_tensor = mixed_canonical_core_only_core_truncation_only(data_tensor,
+                                                                 maximum_bond_dimension,
+                                                                 batch_size_position)
+    data_compressed = tn.tensor_to_matrix(core_tensor, "c")
+
+    return data_compressed
+
+
+def core_compression_core_truncation_only_with_partition(data_matrix, maximum_bond_dimension, feature_partition):
+    """
+    Performs dimensionality reduction by extracting the core of a mixed canonical representation of the data tensor.
+    In this implementation one has to supply the partition. NB: This has to be a factorization of num_features!
+    The new representation has at most maximum_bond_dimension^2 number of features.
+    This "core truncation only" version of "core_compression" truncates only the bonds attached to the core tensor
+
+    :param data_matrix: A data array with rows as instances and columns as features
+    :param maximum_bond_dimension: The  bond dimension of the output core tensor.
+    :param feature_partition: A list. The partition according to which the feature dimension data matrix will be tensorized.
+    :return data_compressed: A compressed representation of the initial data array.
+    """
+
+    batch_size = np.shape(data_matrix)[0]  # This is not actually the batch size (TrainingSize)
+    partition = [batch_size]
+    partition.extend(feature_partition)
+
+    tensor_labels = ["batchsize"]
+    tensor_labels.extend([str(j + 1) for j in range(np.size(feature_partition))])
 
     num_cores = np.size(partition)
     batch_size_position = int(round((num_cores - 1) / 2))
