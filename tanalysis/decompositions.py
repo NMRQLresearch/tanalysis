@@ -10,13 +10,13 @@ from .reconstructions import *
 def truncated_svd_ret_sv(tensor, row_labels, chi=0, threshold=1e-15,
                          absorb_singular_values="right", absolute=True):
     """
-    This function overwrites tn.truncated_svd. It performs an svd of the given tensor, as per tn.tensor_svd,
-    but then truncates according to both the specified maximum number of singular values and a relative
+    This function overwrites tn.truncated_svd. It performs an svd of a reshaped version of the given tensor, as per
+    tn.tensor_svd, but then truncates according to both the specified maximum number of singular values and a relative
     or absolute singular value threshold. This version returns both the original and retained singular values.
 
     :param tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param row_labels: The labels of the tensor which will be reshaped and joined into the matrix row index.
-    :param chi: The maximum number of singular values -> chi=0 implies np truncation.
+    :param chi: The maximum number of singular values -> chi=0 implies no truncation.
     :param threshold: The absolute or relative threshold for singular value truncation.
     :param absorb_singular_values: Determines whether S is incorporated into U or V
     :param absolute: Determines absolute or relative thresholding.
@@ -37,18 +37,20 @@ def truncated_svd_ret_sv(tensor, row_labels, chi=0, threshold=1e-15,
     else:
         singular_values_to_keep = singular_values
 
-    # Thresholding
+    # Truncate any remaining singular values above the relative or absolute threshold
 
     if absolute:
+        # If absolute, then truncate all sv's beneath the threshold
         singular_values_to_keep = singular_values_to_keep[singular_values_to_keep > threshold]
     else:
+        # If relative then calculate the threshold relative to the largest singular value before truncation
         rel_thresh = singular_values[0] * threshold
         singular_values_to_keep = singular_values_to_keep[singular_values_to_keep > rel_thresh]
 
     S.data = np.diag(singular_values_to_keep)
 
     U.move_index("svd_in", 0)
-    U.data = U.data[0:len(singular_values_to_keep)]  # U.data=U.data[:,:,0:len(singular_values_to_keep)]
+    U.data = U.data[0:len(singular_values_to_keep)]
     U.move_index("svd_in", (np.size(U.labels) - 1))
     V.data = V.data[0:len(singular_values_to_keep)]
 
@@ -99,18 +101,20 @@ def truncated_svd_eff(tensor, row_labels, chi=0, threshold=1e-15,
     else:
         singular_values_to_keep = singular_values
 
-    # Thresholding
+    # Truncate any remaining singular values above the relative or absolute threshold
 
     if absolute:
+        # If absolute, then truncate all sv's beneath the threshold
         singular_values_to_keep = singular_values_to_keep[singular_values_to_keep > threshold]
     else:
+        # If relative then calculate the threshold relative to the largest singular value before truncation
         rel_thresh = singular_values[0] * threshold
         singular_values_to_keep = singular_values_to_keep[singular_values_to_keep > rel_thresh]
 
     S.data = np.diag(singular_values_to_keep)
 
     U.move_index("svd_in", 0)
-    U.data = U.data[0:len(singular_values_to_keep)]  # U.data=U.data[:,:,0:len(singular_values_to_keep)]
+    U.data = U.data[0:len(singular_values_to_keep)]
     U.move_index("svd_in", (np.size(U.labels) - 1))
     V.data = V.data[0:len(singular_values_to_keep)]
 
@@ -137,26 +141,23 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
     """
     Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
     No truncation of any of the bonds is performed.
-    Also provides the singular values (both retained and full) from the decomposition procedure.
+    Also provides the singular values from the decomposition procedure.
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
-    :param core_bond_dimension: The bond dimension of the output core tensor.
     :param batch_size_position: The index number corresponding to the batch (training sample number) index.
     :return left: A list of left canonical 3-tensors from the left hand edge up to the core tensor.
     :return right: A list of right canonical 3-tensors from the right hand edge up to the core tensor.
     :return core: The core tensor of the mixed canonical MPS.
-    :return full_singular_values: A list of lists of singular values per bond, before truncation.
-    :return retained_singular_values: A list of lists of singular values per bond, after truncation
+    :return full_singular_values: A list of lists of singular values per bond.
     """
 
     working_tensor = data_tensor.copy()
     num_cores = np.size(working_tensor.labels)
-    left = [None] * (batch_size_position)
+    left = [None] * batch_size_position
     right_count = num_cores - batch_size_position - 1
-    right = [None] * (right_count)
+    right = [None] * right_count
 
     full_singular_values = [[] for k in range(num_cores - 1)]
-    retained_singular_values = [[] for k in range(num_cores - 1)]
 
     for j in range(batch_size_position):
 
@@ -168,7 +169,6 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
             left[j].move_index("c", 2)
 
             full_singular_values[j] = np.diag(S.data)
-            retained_singular_values[j] = np.diag(S.data)
 
             working_tensor = tn.contract(S, V, "svd_in", "svd_out")
             working_tensor.replace_label("svd_out", "a")
@@ -180,7 +180,6 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
             left[j].move_index("c", 2)
 
             full_singular_values[j] = np.diag(S.data)
-            retained_singular_values[j] = np.diag(S.data)
 
             working_tensor = tn.contract(S, V, "svd_in", "svd_out")
             working_tensor.replace_label("svd_out", "a")
@@ -197,7 +196,6 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
             right[ind].replace_label(["svd_out", right[ind].labels[2]], ["a", "c"])
 
             full_singular_values[ind_2] = np.diag(S.data)
-            retained_singular_values[ind_2] = np.diag(S.data)
 
             working_tensor = tn.contract(U, S, "svd_in", "svd_out")
             working_tensor.replace_label("svd_in", "b")
@@ -210,7 +208,6 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
             right[ind].move_index("c", 2)
 
             full_singular_values[ind_2] = np.diag(S.data)
-            retained_singular_values[ind_2] = np.diag(S.data)
 
             working_tensor = tn.contract(U, S, "svd_in", "svd_out")
             working_tensor.replace_label("svd_in", "b")
@@ -219,7 +216,7 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
     core.replace_label(core.labels[1], "c")
     core.move_index("c", 2)
 
-    return left, right, core, full_singular_values, retained_singular_values
+    return left, right, core, full_singular_values
 
 
 def mixed_canonical_full(data_tensor, max_bond_dimension, batch_size_position):
@@ -982,7 +979,7 @@ def core_compression(data_matrix, maximum_bond_dimension):
     tensor_labels.extend([str(j + 1) for j in range(np.size(pre_partition))])
 
     num_cores = np.size(partition)
-    batch_size_position = int(round((num_cores - 1) / 2))
+    batch_size_position = int(np.floor((num_cores - 1) / 2))
 
     data_tensor = tn.matrix_to_tensor(data_matrix, partition, labels=tensor_labels)
     data_tensor.move_index("batchsize", batch_size_position)
@@ -1001,7 +998,7 @@ def core_compression_core_truncation_only(data_matrix, maximum_bond_dimension):
     This "core truncation only" version of "core_compression" truncates only the bonds attached to the core tensor
 
     :param data_matrix: A data array with rows as instances and columns as features
-    :param core_bond_dimension: The  bond dimension of the output core tensor.
+    :param maximum_bond_dimension: The  bond dimension of the output core tensor.
     :return data_compressed: A compressed representation of the initial data array.
     """
 
@@ -1015,7 +1012,7 @@ def core_compression_core_truncation_only(data_matrix, maximum_bond_dimension):
     tensor_labels.extend([str(j + 1) for j in range(np.size(pre_partition))])
 
     num_cores = np.size(partition)
-    batch_size_position = int(round((num_cores - 1) / 2))
+    batch_size_position = int(np.floor((num_cores - 1) / 2))
 
     data_tensor = tn.matrix_to_tensor(data_matrix, partition, labels=tensor_labels)
     data_tensor.move_index("batchsize", batch_size_position)
@@ -1028,7 +1025,8 @@ def core_compression_core_truncation_only(data_matrix, maximum_bond_dimension):
     return data_compressed
 
 
-def core_compression_core_truncation_only_with_partition(data_matrix, maximum_bond_dimension, feature_partition):
+def core_compression_core_truncation_only_with_partition(data_matrix, maximum_bond_dimension, feature_partition,
+                                                         batch_size_position):
     """
     Performs dimensionality reduction by extracting the core of a mixed canonical representation of the data tensor.
     In this implementation one has to supply the partition. NB: This has to be a factorization of num_features!
@@ -1037,7 +1035,9 @@ def core_compression_core_truncation_only_with_partition(data_matrix, maximum_bo
 
     :param data_matrix: A data array with rows as instances and columns as features
     :param maximum_bond_dimension: The  bond dimension of the output core tensor.
-    :param feature_partition: A list. The partition according to which the feature dimension data matrix will be tensorized.
+    :param feature_partition: A list. The partition according to which the features dimension of the data matrix will
+    be tensorized.
+    :param batch_size_position: The position where the batch size index should be placed in the partition (counting from 0)
     :return data_compressed: A compressed representation of the initial data array.
     """
 
@@ -1048,15 +1048,43 @@ def core_compression_core_truncation_only_with_partition(data_matrix, maximum_bo
     tensor_labels = ["batchsize"]
     tensor_labels.extend([str(j + 1) for j in range(np.size(feature_partition))])
 
-    num_cores = np.size(partition)
-    batch_size_position = int(round((num_cores - 1) / 2))
-
     data_tensor = tn.matrix_to_tensor(data_matrix, partition, labels=tensor_labels)
     data_tensor.move_index("batchsize", batch_size_position)
 
     core_tensor = mixed_canonical_core_only_core_truncation_only(data_tensor,
                                                                  maximum_bond_dimension,
                                                                  batch_size_position)
+    data_compressed = tn.tensor_to_matrix(core_tensor, "c")
+
+    return data_compressed
+
+
+def core_compression_with_partition(data_matrix, maximum_bond_dimension, feature_partition, batch_size_position):
+    """
+    Performs dimensionality reduction by extracting the core of a mixed canonical representation of the data tensor.
+    In this implementation one has to supply the partition. NB: This has to be a factorization of num_features!
+    The new representation has at most maximum_bond_dimension^2 number of features.
+
+
+    :param data_matrix: A data array with rows as instances and columns as features
+    :param maximum_bond_dimension: The  bond dimension of the output core tensor.
+    :param feature_partition: A list. The partition according to which the feature dimension data matrix will be tensorized.
+    :param batch_size_position: The position where the batch size index should be placed in the partition (counting from 0)
+    :return data_compressed: A compressed representation of the initial data array.
+    """
+
+    batch_size = np.shape(data_matrix)[0]  # This is not actually the batch size (TrainingSize)
+    partition = [batch_size]
+    partition.extend(feature_partition)
+
+    tensor_labels = ["batchsize"]
+    tensor_labels.extend([str(j + 1) for j in range(np.size(feature_partition))])
+
+    data_tensor = tn.matrix_to_tensor(data_matrix, partition, labels=tensor_labels)
+    data_tensor.move_index("batchsize", batch_size_position)
+
+    core_tensor = mixed_canonical_core_only(data_tensor, maximum_bond_dimension, batch_size_position)
+
     data_compressed = tn.tensor_to_matrix(core_tensor, "c")
 
     return data_compressed

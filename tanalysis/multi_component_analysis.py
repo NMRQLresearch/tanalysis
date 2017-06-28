@@ -3,9 +3,10 @@ import tncontract as tn
 from .reconstructions import *
 
 
-def extract_core_tensor_via_common_features(data_tensor,left_features,right_features):
+def extract_core_tensor_via_common_features(data_tensor, left_features, right_features):
     """
-    Performs dimensionality reduction of the data (pre tensorized) by extracting a core-tensor via pre-exisiting left and right features
+    Performs dimensionality reduction of the data (pre tensorized) by extracting a core-tensor via pre-existing
+    left and right features.
     These pre-existing features are usually obtained by a mixed canonical decomposition of training data
 
     :param data_tensor: The tensorized data that we want to be reduced via MCA. The partition must match the MCS.
@@ -27,7 +28,6 @@ def extract_core_tensor_via_common_features(data_tensor,left_features,right_feat
     label_list = ["batchsize"]
     label_list.extend([str(j + 1) for j in range(partition_size - 1)])
 
-
     right_labeling = label_list[batch_size_position + 1:partition_size]
     left_labeling = label_list[1:batch_size_position + 1]
     right_consolidated.replace_label([right_consolidated.labels[j] for j in range(1, np.size(right_consolidated.labels))], right_labeling)
@@ -46,7 +46,7 @@ def extract_core_tensor_via_common_features(data_tensor,left_features,right_feat
 def extract_core_tensor_via_common_features_from_matrix(data_matrix, left, right):
     """
     Performs dimensionality reduction of the data by extracting a core-tensor via pre-existing left and right features
-    These pre-exsiting features are usually obtained by a mixed canonical decomposition of training data
+    These pre-existing features are usually obtained by a mixed canonical decomposition of training data
     This version ensures that the partitioning of the test data matches up accordingly
     ---> it is preferable to use this over "extract_core_tensor_via_common_features"
 

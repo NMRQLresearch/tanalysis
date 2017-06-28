@@ -54,7 +54,7 @@ def reconstruct_to_tensor(mps):
     return tensor_form
 
 
-def reconstruct_to_matrix(mps,batch_size_position):
+def reconstruct_to_matrix(mps, batch_size_position):
     """
     Reconstructs a data matrix from a MPS.
 
@@ -64,7 +64,7 @@ def reconstruct_to_matrix(mps,batch_size_position):
     """
 
     tensor_form = reconstruct_to_tensor(mps)
-    matrix_form = tn.tensor_to_matrix(tensor_form,str(batch_size_position))
+    matrix_form = tn.tensor_to_matrix(tensor_form, str(batch_size_position))
 
     return matrix_form
 
@@ -81,7 +81,7 @@ def reconstruct_to_matrix_from_mc(left, right, core):
 
     batch_size_position = np.size(left)
     mps = mixed_consolidate(left, right, core)
-    matrix_form = reconstruct_to_matrix(mps,batch_size_position)
+    matrix_form = reconstruct_to_matrix(mps, batch_size_position)
 
     return matrix_form
 
