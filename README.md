@@ -27,10 +27,9 @@ import numpy as np
 from numpy import random as rd
 import tncontract as tn
 import tanalysis as ta
-import time
 
-from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.models import Sequential, load_model
+from keras.callbacks import EarlyStopping
+from keras.models import Sequential
 from keras.regularizers import l1_l2
 from keras.layers import Dense, Dropout
 
