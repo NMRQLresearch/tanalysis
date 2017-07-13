@@ -13,7 +13,7 @@ _Tanalysis_ is a package aimed at facilitating the use of various Matrix Product
 <img src="https://user-images.githubusercontent.com/6330346/28163528-d0e38428-67cb-11e7-8fe0-eabd012907bd.jpeg">
 </p>
 
-#### Installation
+### Installation
 
 _Tanalysis_ runs in python 2.7 or greater, and has the following additional dependencies:
 
@@ -27,12 +27,12 @@ To install tanalysis clone the repository and run the following command in the p
 python setup.py install
 ```
 
-#### Issues and Feature Requests
+### Issues and Feature Requests
 
 Tanalysis is a work in progress. Comments, suggestions and queries are welcome. Please contact 
 
 
-#### Getting Started: Example usage
+### Getting Started: Example usage
 
 In what follows we illustrate the functionality provided for in the current version of tanalysis, by looking at the [MNIST](http://yann.lecun.com/exdb/mnist/) dataset. The following code snippets can be pasted into jupyter notebook cells to reproduce the results. If a particular cell generates any output, this is shown as a seperate cell beneath the code snippet. It should be noted that tanalysis heavily utilizes the tncontract library, and aims to provide a slightly easier and more flexible user interface to tncontract decompositions for users without a physics specific background, who have data-science/ML specific applications in mind.
 
