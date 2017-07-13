@@ -15,7 +15,7 @@ Tanalysis is a package aimed at facilitating the use of various Matrix Product S
 
 #### Example usage:
 
-In what follows we illustrate the functionality provided for in the current version of tanalysis, by looking at the [MNIST](http://yann.lecun.com/exdb/mnist/) dataset.
+In what follows we illustrate the functionality provided for in the current version of tanalysis, by looking at the [MNIST](http://yann.lecun.com/exdb/mnist/) dataset. The following code snippets can be pasted into jupyter notebook cells to reproduce the results.
 
 
 We begin by importing the packages we are going to use for this demonstration. In particular, in addition to tanalysis and its dependency tncontract, we will use both tensorflow and Keras, in order to illustrate a full typical use-case scenario. We also import the MNIST dataset, which is provided via tensorflow.
@@ -79,7 +79,9 @@ Now we can get going with our feature extraction and dimensionality reduction.
 
 The first step in any of the tensor network decomposition procedures is to _tensorize_ the data by proving a valid factorization of the features dimension of the dataset - i.e. we want to transform our data matrix into a higher order tensor - see [this](https://arxiv.org/abs/1603.03039) introduction to tensor networks if this step, or the following diagrammatic notation, is unclear in any way.
 
+<p align="center">
 <img src="https://user-images.githubusercontent.com/6330346/28163500-b4292c20-67cb-11e7-8bec-521c64c01071.jpeg">
+</p>
 
 Note that in many natural scenarios, such as colour images, video, or financial data, the dataset will be naturally provided as a higher-order (higher than two) tensor, and as such this first step may be unnecessary (it is however, and open question whether or not an alternative tensorization of a dataset may be helpful in extracting meaningful features, or achieving better compression).
 
@@ -88,9 +90,11 @@ In order to tensorize data in tanalysis (which runs on top of [tncontract](https
    1. A list detailing the factorization. The first element of this list must always be the number of examples (typically rows) in the dataset - i.e in the top tensorization shown in the above image this list would be [55000, 7,2,4,2,7].
    2. A list detailing the labels of the tensor indices. The first element of this list should always be the string "batchsize" and the subsequent elements of the list should be strings enumerating the number of tensor indices, starting at 1 - i.e. ["batchsize","1","2","3","4","5"].
    3. An integer specifying where the batch size index should be placed in the tensorization - i.e. specifiying 3 for the batch size position would result in the tensorization shown in the image below.
-   
+
+<p> 
 <img src="https://user-images.githubusercontent.com/6330346/28163477-9a3c7dc6-67cb-11e7-92eb-dc79f73764f7.jpeg">
-   
+</p>  
+
 Finally, once the tensorization has been fully specified, as above, we can use tncontract to convert the initial data tensor into a tncontract tensor object with the specified tensorization.
 
 
@@ -216,7 +220,9 @@ At this stage its possible to go ahead and perform any of the decompositions cat
 
 The first option is a full mixed canonical decomposition, with a variety of options. Firstly, we can choose whether to truncate _all_ bonds, or just truncate the bonds attached to the core tensor. We can also choose whether to return just the core tensor, or the core tensor along with the left canonical part and the right canonical part of the MPS, as illustrated below.
 
+<p>
 <img src="https://user-images.githubusercontent.com/6330346/28163520-c97308da-67cb-11e7-980b-d0fbc16ff74c.jpeg">
+</p>
 
 Furthermore, we can specify whether or not we would like the method to return the pre and post truncation singular values across bonds, which may help with diagnosis of the method and optimizing the bond-dimension. As a note, for those with previous experience with tensor networks, the decompositions in tanalysis provide _unnormalized_ vectors (just to keep in mind). 
 
@@ -273,8 +279,9 @@ print(ret_bs_list_1)
 
 Now, what we are really interested in is obtaining new compressed feature vectors. As suggested [here](https://arxiv.org/abs/1503.00516v2), and illustrated below, one method of doing this is to extract and reshape the core tensor:
 
+<p>
 <img src="https://user-images.githubusercontent.com/6330346/28163563-030f85d2-67cc-11e7-90fe-25cccb4b6cba.jpeg">
-
+</p>
 
 
 ```python
@@ -340,8 +347,9 @@ left_canonical_mps = ta.left_canonical_decompose_no_diagnostics(training_data_te
 
 Or finally, you could, obtain a left canonical decomposition not of a tensorized version of the entire dataset (as we have done above), but rather of _each feature vector individually_. Once again, this could be useful if you wanted to explore tensorized neural networks.
 
+<p>
 <img src="https://user-images.githubusercontent.com/6330346/28163503-b6d287f0-67cb-11e7-8f8c-a2add80bc709.jpeg">
-
+</p>
 
 
 ```python
@@ -429,9 +437,9 @@ for j in range(num_display):
         axes1[j][4].imshow(training_images_individual_compressed[display_indices[j],:,:], cmap = 'gray')
 ```
 
-
+<p>
 <img src="https://user-images.githubusercontent.com/6330346/28164083-f5dd2674-67cd-11e7-80bd-a73342bdb82c.png">
-
+</p>
 
 Great. At this stage we have achieved a pretty good overview of what tanalysis can (currently) do, and the conventions for specifying tensorizations and decompositions. To finish off lets look at a complete end-to-end example of using tanalysis as a data pre-processing recipe before a feed-forward deep neural network classifier (built using a [Keras sequential model](https://keras.io/models/sequential/)).
 
