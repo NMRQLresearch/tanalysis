@@ -97,6 +97,7 @@ def compress_partition(partition, steps, step_size, sym=True):
 
         return new_partition, compression_success
 
+
 def full_partition(data):
     """
     Performs full virtual tensorization of a data matrix via the symmetrized raw partition.
