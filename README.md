@@ -91,7 +91,7 @@ In order to tensorize data in tanalysis (which runs on top of [tncontract](https
    2. A list detailing the labels of the tensor indices. The first element of this list should always be the string "batchsize" and the subsequent elements of the list should be strings enumerating the number of tensor indices, starting at 1 - i.e. ["batchsize","1","2","3","4","5"].
    3. An integer specifying where the batch size index should be placed in the tensorization - i.e. specifiying 3 for the batch size position would result in the tensorization shown in the image below.
 
-<p> 
+<p align="center">
 <img src="https://user-images.githubusercontent.com/6330346/28163477-9a3c7dc6-67cb-11e7-92eb-dc79f73764f7.jpeg">
 </p>  
 
@@ -220,7 +220,7 @@ At this stage its possible to go ahead and perform any of the decompositions cat
 
 The first option is a full mixed canonical decomposition, with a variety of options. Firstly, we can choose whether to truncate _all_ bonds, or just truncate the bonds attached to the core tensor. We can also choose whether to return just the core tensor, or the core tensor along with the left canonical part and the right canonical part of the MPS, as illustrated below.
 
-<p>
+<p align="center">
 <img src="https://user-images.githubusercontent.com/6330346/28163520-c97308da-67cb-11e7-980b-d0fbc16ff74c.jpeg">
 </p>
 
@@ -279,7 +279,7 @@ print(ret_bs_list_1)
 
 Now, what we are really interested in is obtaining new compressed feature vectors. As suggested [here](https://arxiv.org/abs/1503.00516v2), and illustrated below, one method of doing this is to extract and reshape the core tensor:
 
-<p>
+<p align="center">
 <img src="https://user-images.githubusercontent.com/6330346/28163563-030f85d2-67cc-11e7-90fe-25cccb4b6cba.jpeg">
 </p>
 
@@ -347,7 +347,7 @@ left_canonical_mps = ta.left_canonical_decompose_no_diagnostics(training_data_te
 
 Or finally, you could, obtain a left canonical decomposition not of a tensorized version of the entire dataset (as we have done above), but rather of _each feature vector individually_. Once again, this could be useful if you wanted to explore tensorized neural networks.
 
-<p>
+<p align="center">
 <img src="https://user-images.githubusercontent.com/6330346/28163503-b6d287f0-67cb-11e7-8f8c-a2add80bc709.jpeg">
 </p>
 
@@ -437,7 +437,7 @@ for j in range(num_display):
         axes1[j][4].imshow(training_images_individual_compressed[display_indices[j],:,:], cmap = 'gray')
 ```
 
-<p>
+<p align="center">
 <img src="https://user-images.githubusercontent.com/6330346/28164083-f5dd2674-67cd-11e7-80bd-a73342bdb82c.png">
 </p>
 
