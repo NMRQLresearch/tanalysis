@@ -19,7 +19,7 @@ _Tanalysis_ runs in python 2.7 or greater, and has the following additional depe
 
   1. numpy
   2. sympy
-  3. [tncontract](https://github.com/andrewdarmawan/tncontract) (tested with tncontract v )
+  3. [tncontract](https://github.com/andrewdarmawan/tncontract) (This package is also an active work in progress, Tanalysis has been tested and verified to work on top of tncontract v0.1.0 1/06/2017)
 
 To install tanalysis clone the repository and run the following command in the package root directory: 
 
@@ -29,7 +29,7 @@ python setup.py install
 
 ### Issues and Feature Requests
 
-Tanalysis is a work in progress. Comments, suggestions and queries are welcome. Please contact 
+Tanalysis is a work in progress. Comments, suggestions and queries are welcome. Please contact us! 
 
 
 ### Getting Started: Example usage
