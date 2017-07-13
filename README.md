@@ -9,3 +9,10 @@ However, more recently, tensor network decompositions have started to attract th
 Tanalysis is a package aimed at facilitating the use of various Matrix Product State decompositions for feature extraction and dimensionality reduction. In particular the goal is to allow flexibility and ease of use, with the hope of both spurring research in this domain, while simultaneously allowing quick and easy comparisons with existing methods on real world datasets and problems.
 
 <center><img src="https://user-images.githubusercontent.com/6330346/28163528-d0e38428-67cb-11e7-8fe0-eabd012907bd.jpeg"></center>
+
+#### Example usage:
+
+In what follows we illustrate the functionality provided for in the current version of tanalysis, by looking at the [MNIST](http://yann.lecun.com/exdb/mnist/) dataset.
+
+
+We begin by importing the packages we are going to use for this demonstration. In particular, in addition to tanalysis and its dependency tncontract, we will use both tensorflow and Keras, in order to illustrate a full typical use-case scenario. We also import the MNIST dataset, which is provided via tensorflow.
