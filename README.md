@@ -554,3 +554,8 @@ print('Final accuracy on test set:', final_score[1])
 
 
 Great, we achieved an accuracy of just over 98%, with very few features, and a relatively simple NN. The result is definitely not state of the art, but hopefully this motivates and faciliates new experimentation and research!
+
+### Contributors
+
+  1. [Ryan Sweke](https://github.com/R-Sweke)
+  2. [Stuart Reid](https://github.com/StuartGordonReid)
