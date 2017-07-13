@@ -7,7 +7,7 @@ Over the last two-decades, tensor network decompositions have played a huge role
 
 However, more recently, tensor network decompositions have started to attract the attention of the machine learning and data science communities. From the learning algorithms perspective tensor networks have recently begun to be utilized, amongst other applications, as a tool for investigating and understanding the [properties of deep neural networks](https://arxiv.org/abs/1704.01552), [compressing neural network layers](https://arxiv.org/abs/1611.03214) and designing [new learning algorithms](https://arxiv.org/abs/1605.05775). From a more data science perspective, it has been recognized how various tensor network decompositions can be utilised for [feature extraction and dimensionality reduction](https://arxiv.org/abs/1403.2048), particularly within the context of [multi-dimensional datasets](https://arxiv.org/abs/1503.00516), represented by [higher order tensors](https://arxiv.org/abs/1503.00516v2), such as video and colour images.
 
-Tanalysis is a package aimed at facilitating the use of various Matrix Product State decompositions for feature extraction and dimensionality reduction. In particular the goal is to allow flexibility and ease of use, with the hope of both spurring research in this domain, while simultaneously allowing quick and easy comparisons with existing methods on real world datasets and problems.
+_Tanalysis_ is a package aimed at facilitating the use of various Matrix Product State decompositions for feature extraction and dimensionality reduction. In particular the goal is to allow flexibility and ease of use, with the hope of both spurring research in this domain, while simultaneously allowing quick and easy comparisons with existing methods on real world datasets and problems.
 
 <p align="center">
 <img src="https://user-images.githubusercontent.com/6330346/28163528-d0e38428-67cb-11e7-8fe0-eabd012907bd.jpeg">
@@ -536,8 +536,3 @@ print('Final accuracy on test set:', final_score[1])
 
 
 Great, we achieved an accuracy of just over 98%, with very few features, and a relatively simple NN. The result is definitely not state of the art, but hopefully this motivates and faciliates new experimentation and research!
-
-
-```python
-
-```
