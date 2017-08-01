@@ -5,13 +5,88 @@ from .reconstructions import *
 
 
 # --------------------------------------------------------------------------------------
-# The following two functions provide slightly modified versions of tncontract functions
+# The following three functions provide slightly modified versions of tncontract functions
+
+def tensor_svd(tensor, row_labels, svd_label="svd_",
+               absorb_singular_values=None, thresholding=True, threshold=1e-18):
+    """
+    This is a modifed version of the tncontract tensor_svd function which includes the option
+    of thresholding functionality for numerical stability. Any sv's below the threshold are set to zero.
+    """
+
+    t = tensor.copy()
+
+    # Move labels in row_labels to the beginning of list, and reshape data
+    # accordingly
+    total_input_dimension = 1
+    for i, label in enumerate(row_labels):
+        t.move_index(label, i)
+        total_input_dimension *= t.data.shape[i]
+
+    column_labels = [x for x in t.labels if x not in row_labels]
+
+    old_shape = t.data.shape
+    total_output_dimension = int(np.product(t.data.shape) / total_input_dimension)
+    data_matrix = np.reshape(t.data, (total_input_dimension,
+                                      total_output_dimension))
+
+    try:
+        u, s, v = np.linalg.svd(data_matrix, full_matrices=False)
+    except (np.linalg.LinAlgError, ValueError):
+        # Try with different lapack driver
+        warnings.warn(('numpy.linalg.svd failed, trying scipy.linalg.svd with' +
+                       ' lapack_driver="gesvd"'))
+        try:
+            u, s, v = sp.linalg.svd(data_matrix, full_matrices=False,
+                                    lapack_driver='gesvd')
+        except ValueError:
+            # Check for inf's and nan's:
+            print("tensor_svd failed. Matrix contains inf's: "
+                  + str(np.isinf(data_matrix).any())
+                  + ". Matrix contains nan's: "
+                  + str(np.isnan(data_matrix).any()))
+            raise  # re-raise the exception
+
+    # Perform thresholding on the sv's for numerical stability if requested
+    if thresholding:
+        s[s < threshold] = 0
+
+    # New shape original index labels as well as svd index
+    U_shape = list(old_shape[0:len(row_labels)])
+    U_shape.append(u.shape[1])
+    U = tn.Tensor(data=np.reshape(u, U_shape), labels=row_labels + [svd_label + "in"])
+    V_shape = list(old_shape)[len(row_labels):]
+    V_shape.insert(0, v.shape[0])
+    V = tn.Tensor(data=np.reshape(v, V_shape),
+               labels=[svd_label + "out"] + column_labels)
+
+    S = tn.Tensor(data=np.diag(s), labels=[svd_label + "out", svd_label + "in"])
+
+    # Absorb singular values S into either V or U
+    # or take the square root of S and absorb into both
+    if absorb_singular_values == "left":
+        U_new = tn.contract(U, S, ["svd_in"], ["svd_out"])
+        V_new = V
+        return U_new, V_new
+    elif absorb_singular_values == "right":
+        V_new = tn.contract(S, V, ["svd_in"], ["svd_out"])
+        U_new = U
+        return U_new, V_new
+    elif absorb_singular_values == "both":
+        sqrtS = S.copy()
+        sqrtS.data = np.sqrt(sqrtS.data)
+        U_new = tn.contract(U, sqrtS, ["svd_in"], ["svd_out"])
+        V_new = tn.contract(sqrtS, V, ["svd_in"], ["svd_out"])
+        return U_new, V_new
+    else:
+        return U, S, V
+
 
 def truncated_svd_ret_sv(tensor, row_labels, chi=0, threshold=1e-15,
                          absorb_singular_values="right", absolute=True):
     """
     This function overwrites tn.truncated_svd. It performs an svd of a reshaped version of the given tensor, as per
-    tn.tensor_svd, but then truncates according to both the specified maximum number of singular values and a relative
+    tensor_svd, but then truncates according to both the specified maximum number of singular values and a relative
     or absolute singular value threshold. This version returns both the original and retained singular values.
 
     :param tensor: The multi-dimensional (tncontract) tensor to be decomposed.
@@ -26,7 +101,7 @@ def truncated_svd_ret_sv(tensor, row_labels, chi=0, threshold=1e-15,
     :return singular_values_to_keep: a list of the retained singular values
     """
 
-    U, S, V = tn.tensor_svd(tensor, row_labels)
+    U, S, V = tensor_svd(tensor, row_labels)
 
     singular_values = np.diag(S.data)
 
@@ -90,7 +165,7 @@ def truncated_svd_eff(tensor, row_labels, chi=0, threshold=1e-15,
     :return new_bond_percentage: a list of the ratios of truncated bond dimensions over original bond dimensions.
     """
 
-    U, S, V = tn.tensor_svd(tensor, row_labels)
+    U, S, V = tensor_svd(tensor, row_labels)
 
     singular_values = np.diag(S.data)
 
@@ -163,7 +238,7 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
 
         if j == 0:
 
-            left[j], S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0]])
+            left[j], S, V = tensor_svd(working_tensor, [working_tensor.labels[0]])
             left[j].add_dummy_index("a", position=0)
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
             left[j].move_index("c", 2)
@@ -175,7 +250,7 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
 
         else:
 
-            left[j], S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
+            left[j], S, V = tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
             left[j].move_index("c", 2)
 
@@ -190,7 +265,7 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
 
         if j == 0:
 
-            U, S, right[ind] = tn.tensor_svd(working_tensor, [working_tensor.labels[k] for k in
+            U, S, right[ind] = tensor_svd(working_tensor, [working_tensor.labels[k] for k in
                                                               range(np.size(working_tensor.labels) - 1)])
             right[ind].add_dummy_index("b", position=1)
             right[ind].replace_label(["svd_out", right[ind].labels[2]], ["a", "c"])
@@ -202,7 +277,7 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
 
         else:
 
-            U, S, right[ind] = tn.tensor_svd(working_tensor, [working_tensor.labels[k] for k in
+            U, S, right[ind] = tensor_svd(working_tensor, [working_tensor.labels[k] for k in
                                                               range(np.size(working_tensor.labels) - 2)])
             right[ind].replace_label(["svd_out", right[ind].labels[1]], ["a", "c"])
             right[ind].move_index("c", 2)
@@ -538,7 +613,7 @@ def mixed_canonical_full_core_truncation_only(data_tensor, core_bond_dimension, 
 
         if j == 0 and j != (batch_size_position - 1):
 
-            left[j], S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0]])
+            left[j], S, V = tensor_svd(working_tensor, [working_tensor.labels[0]])
             left[j].add_dummy_index("a", position=0)
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
             left[j].move_index("c", 2)
@@ -570,7 +645,7 @@ def mixed_canonical_full_core_truncation_only(data_tensor, core_bond_dimension, 
 
         else:
 
-            left[j], S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
+            left[j], S, V = tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
             left[j].move_index("c", 2)
 
@@ -582,7 +657,7 @@ def mixed_canonical_full_core_truncation_only(data_tensor, core_bond_dimension, 
 
         if j == 0 and j != (right_count - 1):
 
-            U, S, right[ind] = tn.tensor_svd(working_tensor, [working_tensor.labels[k] for k in
+            U, S, right[ind] = tensor_svd(working_tensor, [working_tensor.labels[k] for k in
                                                               range(np.size(working_tensor.labels) - 1)])
             right[ind].add_dummy_index("b", position=1)
             right[ind].replace_label(["svd_out", right[ind].labels[2]], ["a", "c"])
@@ -616,7 +691,7 @@ def mixed_canonical_full_core_truncation_only(data_tensor, core_bond_dimension, 
 
         else:
 
-            U, S, right[ind] = tn.tensor_svd(working_tensor, [working_tensor.labels[k] for k in
+            U, S, right[ind] = tensor_svd(working_tensor, [working_tensor.labels[k] for k in
                                                               range(np.size(working_tensor.labels) - 2)])
             right[ind].replace_label(["svd_out", right[ind].labels[1]], ["a", "c"])
             right[ind].move_index("c", 2)
@@ -660,7 +735,7 @@ def mixed_canonical_full_core_truncation_only_ret_sv(data_tensor, core_bond_dime
 
         if j == 0 and j != (batch_size_position - 1):
 
-            left[j], S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0]])
+            left[j], S, V = tensor_svd(working_tensor, [working_tensor.labels[0]])
             left[j].add_dummy_index("a", position=0)
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
             left[j].move_index("c", 2)
@@ -695,7 +770,7 @@ def mixed_canonical_full_core_truncation_only_ret_sv(data_tensor, core_bond_dime
 
         else:
 
-            left[j], S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
+            left[j], S, V = tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
             left[j].replace_label([left[j].labels[1], "svd_in"], ["c", "b"])
             left[j].move_index("c", 2)
 
@@ -711,7 +786,7 @@ def mixed_canonical_full_core_truncation_only_ret_sv(data_tensor, core_bond_dime
 
         if j == 0 and j != (right_count - 1):
 
-            U, S, right[ind] = tn.tensor_svd(working_tensor, [working_tensor.labels[k] for k in
+            U, S, right[ind] = tensor_svd(working_tensor, [working_tensor.labels[k] for k in
                                                               range(np.size(working_tensor.labels) - 1)])
             right[ind].add_dummy_index("b", position=1)
             right[ind].replace_label(["svd_out", right[ind].labels[2]], ["a", "c"])
@@ -747,7 +822,7 @@ def mixed_canonical_full_core_truncation_only_ret_sv(data_tensor, core_bond_dime
 
         else:
 
-            U, S, right[ind] = tn.tensor_svd(working_tensor, [working_tensor.labels[k] for k in
+            U, S, right[ind] = tensor_svd(working_tensor, [working_tensor.labels[k] for k in
                                                               range(np.size(working_tensor.labels) - 2)])
             right[ind].replace_label(["svd_out", right[ind].labels[1]], ["a", "c"])
             right[ind].move_index("c", 2)
@@ -784,7 +859,7 @@ def mixed_canonical_core_only_core_truncation_only(data_tensor, core_bond_dimens
 
         if j == 0 and j != (batch_size_position - 1):
 
-            U, S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0]])
+            U, S, V = tensor_svd(working_tensor, [working_tensor.labels[0]])
 
             working_tensor = tn.contract(S, V, "svd_in", "svd_out")
             working_tensor.replace_label("svd_out", "a")
@@ -804,7 +879,7 @@ def mixed_canonical_core_only_core_truncation_only(data_tensor, core_bond_dimens
 
         else:
 
-            U, S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
+            U, S, V = tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
 
             working_tensor = tn.contract(S, V, "svd_in", "svd_out")
             working_tensor.replace_label("svd_out", "a")
@@ -813,7 +888,7 @@ def mixed_canonical_core_only_core_truncation_only(data_tensor, core_bond_dimens
 
         if j == 0 and j != (right_count - 1):
 
-            U, S, V = tn.tensor_svd(working_tensor,
+            U, S, V = tensor_svd(working_tensor,
                                     [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 1)])
 
             working_tensor = tn.contract(U, S, "svd_in", "svd_out")
@@ -839,7 +914,7 @@ def mixed_canonical_core_only_core_truncation_only(data_tensor, core_bond_dimens
 
         else:
 
-            U, S, V = tn.tensor_svd(working_tensor,
+            U, S, V = tensor_svd(working_tensor,
                                     [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 2)])
 
             working_tensor = tn.contract(U, S, "svd_in", "svd_out")
@@ -876,7 +951,7 @@ def mixed_canonical_core_only_core_truncation_only_ret_sv(data_tensor, core_bond
 
         if j == 0 and j != (batch_size_position - 1):
 
-            U, S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0]])
+            U, S, V = tensor_svd(working_tensor, [working_tensor.labels[0]])
 
             full_singular_values[j] = np.diag(S.data)
             retained_singular_values[j] = np.diag(S.data)
@@ -900,7 +975,7 @@ def mixed_canonical_core_only_core_truncation_only_ret_sv(data_tensor, core_bond
 
         else:
 
-            U, S, V = tn.tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
+            U, S, V = tensor_svd(working_tensor, [working_tensor.labels[0], working_tensor.labels[1]])
 
             full_singular_values[j] = np.diag(S.data)
             retained_singular_values[j] = np.diag(S.data)
@@ -913,7 +988,7 @@ def mixed_canonical_core_only_core_truncation_only_ret_sv(data_tensor, core_bond
 
         if j == 0 and j != (right_count - 1):
 
-            U, S, V = tn.tensor_svd(working_tensor,
+            U, S, V = tensor_svd(working_tensor,
                                     [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 1)])
 
             full_singular_values[ind_2] = np.diag(S.data)
@@ -942,7 +1017,7 @@ def mixed_canonical_core_only_core_truncation_only_ret_sv(data_tensor, core_bond
 
         else:
 
-            U, S, V = tn.tensor_svd(working_tensor,
+            U, S, V = tensor_svd(working_tensor,
                                     [working_tensor.labels[k] for k in range(np.size(working_tensor.labels) - 2)])
 
             full_singular_values[ind_2] = np.diag(S.data)
