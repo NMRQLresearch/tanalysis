@@ -8,7 +8,7 @@ from .reconstructions import *
 # The following three functions provide slightly modified versions of tncontract functions
 
 def tensor_svd(tensor, row_labels, svd_label="svd_",
-               absorb_singular_values=None, thresholding=True, threshold=1e-18):
+               absorb_singular_values=None, thresholding=True, threshold=1e-15):
     """
     This is a modifed version of the tncontract tensor_svd function which includes the option
     of thresholding functionality for numerical stability. Any sv's below the threshold are set to zero.
@@ -50,6 +50,8 @@ def tensor_svd(tensor, row_labels, svd_label="svd_",
     # Perform thresholding on the sv's for numerical stability if requested
     if thresholding:
         s[s < threshold] = 0
+        u[abs(u) < threshold] = 0
+        v[abs(v) < threshold] = 0
 
     # New shape original index labels as well as svd index
     U_shape = list(old_shape[0:len(row_labels)])
