@@ -202,8 +202,8 @@ class TestMultiComponentAnalysisTools(TestCase):
 
     def test_mca(self):
         for j in range(self.num_partitions):
-            npt.assert_allclose(self.extracted_features_a3[j][j],
-                                self.test_extracted_features_a3[j][j],
+            npt.assert_allclose(self.extracted_features_a3[j],
+                                self.test_extracted_features_a3[j],
                                 err_msg="feature mismatch at "+str(j)+" in mca test")
 
 if __name__ == '__main__':
