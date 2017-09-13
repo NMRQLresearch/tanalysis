@@ -27,6 +27,13 @@ To install tanalysis clone the repository and run the following command in the p
 python setup.py install
 ```
 
+Tanalysis includes unit tests for core functionality. It is recommended to run these tests after installation, which can be done by running the following
+code in the root directory of the repository:
+
+```python
+nosetests -v tanalysis
+```
+
 ### Issues and Feature Requests
 
 Tanalysis is a work in progress. Comments, suggestions and queries are welcome. Please contact us! 
@@ -34,7 +41,7 @@ Tanalysis is a work in progress. Comments, suggestions and queries are welcome. 
 
 ### Getting Started: Example usage
 
-In what follows we illustrate the functionality provided for in the current version of tanalysis, by looking at the [MNIST](http://yann.lecun.com/exdb/mnist/) dataset. The following code snippets can be pasted into jupyter notebook cells to reproduce the results (Alternatively, the actual notebook can be found in the jupyter_notebooks folder of the repository). If a particular cell generates any output, this is shown as a seperate cell beneath the code snippet. It should be noted that tanalysis heavily utilizes the tncontract library, and aims to provide a slightly easier and more flexible user interface to tncontract decompositions for users without a physics specific background, who have data-science/ML specific applications in mind.
+In what follows we illustrate the functionality provided for in the current version of tanalysis, by looking at the [MNIST](http://yann.lecun.com/exdb/mnist/) dataset. A jupyter notebook containing the following examples can be found in the jupyter notebooks folder of the respository, or alternatively the following code snippets can be pasted into jupyter notebook cells to reproduce the results. If a particular cell generates any output, this is shown as a seperate cell beneath the code snippet. It should be noted that tanalysis heavily utilizes the tncontract library, and aims to provide a slightly easier and more flexible user interface to tncontract decompositions for users without a physics specific background, who have data-science/ML specific applications in mind.
 
 We begin by importing the packages we are going to use for this demonstration. In particular, in addition to tanalysis and its dependency tncontract, we will use both tensorflow and Keras, in order to illustrate a full typical use-case scenario. We also import the MNIST dataset, which is provided via tensorflow.
 
