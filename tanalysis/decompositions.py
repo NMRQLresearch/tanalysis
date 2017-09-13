@@ -4,20 +4,36 @@ from .partitioning import *
 from .reconstructions import *
 
 
-# --------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------
 # The following three functions provide slightly modified versions of tncontract functions
 
 def tensor_svd(tensor, row_labels, svd_label="svd_",
                absorb_singular_values=None, thresholding=True, threshold=1e-15):
     """
-    This is a modifed version of the tncontract tensor_svd function which includes the option
-    of thresholding functionality for numerical stability. Any sv's below the threshold are set to zero.
+    This is a modified version of the tncontract tensor_svd function which includes the option
+    of singular value thresholding for numerical stability. All indices of the tensor with labels specified in
+    "row_labels" will be grouped into a new row index, while the remaining indices will be grouped into a new columns
+    index. A singular value decomposition is then performed on the resulting matrix, with any sv's below the threshold
+    set to zero (if thresholding = True). The objects returned by the function depend on the value of the
+    "absorb_singular_values" parameter:
+
+        - If "absorb_singular_values" is None then U,S,V will be returned.
+        - If "absorb_singular_values" is "left" then U*S, V will be returned.
+        - If "absorb_singular_values" is "right" then U, S*V will be returned.
+        - If "absorb_singular_values" is "both" then U*sqrt(S), sqrt(S)*V will be returned.
+
+    :param tensor: The multi-dimensional (tncontract) tensor to be decomposed.
+    :param row_labels: The labels of the tensor which will be reshaped and joined into the matrix row index.
+    :param svd_label: The prefix for the "in" and "out" labels which will be attached to the matrix of sv's.
+    :param threshold: The absolute or relative threshold for singular value truncation.
+    :param absorb_singular_values: Determines whether S is incorporated into U or V ("left", "right", "None" or "both")
+    :param thresholding: Determines absolute or relative thresholding.
+    :param threshold: The threshold below which singular values are set to 0 for numerical stability
     """
 
     t = tensor.copy()
 
-    # Move labels in row_labels to the beginning of list, and reshape data
-    # accordingly
+    # Move labels in row_labels to the beginning of list, and reshape data accordingly
     total_input_dimension = 1
     for i, label in enumerate(row_labels):
         t.move_index(label, i)
@@ -87,9 +103,25 @@ def tensor_svd(tensor, row_labels, svd_label="svd_",
 def truncated_svd_ret_sv(tensor, row_labels, chi=0, threshold=1e-15,
                          absorb_singular_values="right", absolute=True):
     """
-    This function overwrites tn.truncated_svd. It performs an svd of a reshaped version of the given tensor, as per
-    tensor_svd, but then truncates according to both the specified maximum number of singular values and a relative
-    or absolute singular value threshold. This version returns both the original and retained singular values.
+    This function is a modified version of tn.truncated_svd which allows for truncation of singular values via a
+    relative or absolute threshold in addition to truncation via a maximum number of allowed singular values.
+    As per tensor_svd a singular value decomposition is performed on the matrix resulting from reshaping via the indices
+    specified in "row_labels", but the singular value matrix S  is then truncated according to both the specified
+    maximum number of singular values (chi) and a relative or absolute singular value threshold:
+
+        - If absolute=True then all singular values smaller than the threshold will be discarded.
+        - If absolute=False then all singular values less than (largest_singular_value*threshold) will be truncated
+        i.e. truncation will be done relative to the largest singular value.
+
+    Again, the objects returned depend on the value of the "absorb_singular_values" parameter:
+
+        - If "absorb_singular_values" is "left" then U*truncated_S, V will be returned.
+        - If "absorb_singular_values" is "right" then U, truncated_S*V will be returned.
+        - If "absorb_singular_values" is not in ["left","right"] then U*sqrt(truncated_S), sqrt(truncated_S)*V will be
+        returned.
+
+    In addition both the original and retained singular values are returned as lists to allow for analysis and diagnosis
+    of the decomposition.
 
     :param tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param row_labels: The labels of the tensor which will be reshaped and joined into the matrix row index.
@@ -154,17 +186,29 @@ def truncated_svd_eff(tensor, row_labels, chi=0, threshold=1e-15,
     """
     An efficient version of truncated_svd which does not return singular values.
 
+    As per tensor_svd a singular value decomposition is performed on the matrix resulting from reshaping via the indices
+    specified in "row_labels", but the singular value matrix S  is then truncated according to both the specified
+    maximum number of singular values (chi) and a relative or absolute singular value threshold:
+
+        - If absolute=True then all singular values smaller than the threshold will be discarded.
+        - If absolute=False then all singular values less than (largest_singular_value*threshold) will be truncated
+        i.e. truncation will be done relative to the largest singular value.
+
+    Again, the objects returned depend on the value of the "absorb_singular_values" parameter:
+
+        If "absorb_singular_values" is "left" then U*truncated_S, V will be returned.
+        If "absorb_singular_values" is "right" then U, truncated_S*V will be returned.
+        If "absorb_singular_values" is not in ["left","right"] then U*sqrt(truncated_S), sqrt(truncated_S)*V will be
+        returned.
+
     :param tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param row_labels: The labels of the tensor which will be reshaped and joined into the matrix row index.
     :param chi: The maximum number of singular values -> chi=0 implies np truncation.
     :param threshold: The absolute or relative threshold for singular value truncation.
     :param absorb_singular_values: Determines whether S is incorporated into U or V
     :param absolute: Determines absolute or relative thresholding.
-    :return U_new: The resulting truncated U matrix
+    :return U_new: The resulting truncated U matrix.
     :return V_new: The resulting truncated V matrix.
-    :return svd_thresholds: A list of the ratios of retained singular values to all singular values per bond.
-    :return original_bonds: a list of original bond dimensions before truncation
-    :return new_bond_percentage: a list of the ratios of truncated bond dimensions over original bond dimensions.
     """
 
     U, S, V = tensor_svd(tensor, row_labels)
@@ -213,12 +257,20 @@ def truncated_svd_eff(tensor, row_labels, chi=0, threshold=1e-15,
 
 
 # ----------------------------------------------------------------------------------------------------
+# The following functions all allow for various MPS decompositions
 
 def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
     """
-    Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
-    No truncation of any of the bonds is performed.
-    Also provides the singular values from the decomposition procedure.
+    Performs a full mixed canonical MPS (Matrix Product State) decomposition of a pre-partitioned data tensor.
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the canonical forms of matrix product states.
+
+    In this implementation:
+        - No truncation of any of the bonds is performed.
+        - The mixed canonical MPS is returned via a list of left canonical tensors, a list of right canonical tensors
+        and a core tensor
+        - A full list of singular values per bond is returned in addition to the resulting mixed canonical MPS.
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param batch_size_position: The index number corresponding to the batch (training sample number) index.
@@ -236,6 +288,7 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
 
     full_singular_values = [[] for k in range(num_cores - 1)]
 
+    # The decomposition is now performed as described on pages 50-55 of https://arxiv.org/abs/1008.3477
     for j in range(batch_size_position):
 
         if j == 0:
@@ -299,6 +352,15 @@ def mixed_canonical_full_no_truncation_ret_sv(data_tensor, batch_size_position):
 def mixed_canonical_full(data_tensor, max_bond_dimension, batch_size_position):
     """
     Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the mixed canonical form of a matrix product state.
+
+    In this implementation:
+        - Truncation of the bonds is performed according to specified max_bond_dimension
+        - The mixed canonical MPS is returned via a list of left canonical tensors, a list of right canonical tensors
+        and a core tensor
+        - No singular values are returned
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param max_bond_dimension: The maximum bond dimension of the output MPS.
@@ -376,7 +438,15 @@ def mixed_canonical_full(data_tensor, max_bond_dimension, batch_size_position):
 def mixed_canonical_full_ret_sv(data_tensor, max_bond_dimension, batch_size_position):
     """
     Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
-    Also returns the singular values from the decomposition procedure.
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the mixed canonical form of a matrix product state.
+
+    In this implementation:
+        - Truncation of the bonds is performed according to specified max_bond_dimension
+        - The mixed canonical MPS is returned via a list of left canonical tensors, a list of right canonical tensors
+        and a core tensor
+        - A full list of singular values per bond, both before and after truncation, is returned.
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param max_bond_dimension: The maximum bond dimension of the output MPS.
@@ -462,8 +532,15 @@ def mixed_canonical_full_ret_sv(data_tensor, max_bond_dimension, batch_size_posi
 
 def mixed_canonical_core_only_ret_sv(data_tensor, max_bond_dimension, batch_size_position):
     """
-    Performs a mixed canonical MPS decomposition of a pre-partitioned data tensor, and only stores the core tensor.
-    Also provides some diagnostics concerning the truncation.
+    Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor and returns only the core tensor
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the mixed canonical form of a matrix product state.
+
+    In this implementation:
+        - Truncation of the bonds is performed according to specified max_bond_dimension
+        - Only the core tensor of the mixed canonical MPS is returned
+        - A full list of singular values per bond, both before and after truncation, is returned.
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param max_bond_dimension: The maximum bond dimension of the output MPS.
@@ -529,7 +606,15 @@ def mixed_canonical_core_only_ret_sv(data_tensor, max_bond_dimension, batch_size
 
 def mixed_canonical_core_only(data_tensor, max_bond_dimension, batch_size_position):
     """
-    Performs a mixed canonical MPS decomposition of a pre-partitioned data tensor, and only stores the core tensor.
+    Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor and returns only the core tensor
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the mixed canonical form of a matrix product state.
+
+    In this implementation:
+        - Truncation of the bonds is performed according to specified max_bond_dimension
+        - Only the core tensor of the mixed canonical MPS is returned
+        - No singular values are returned
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param max_bond_dimension: The maximum bond dimension of the output MPS.
@@ -594,8 +679,17 @@ def mixed_canonical_core_only(data_tensor, max_bond_dimension, batch_size_positi
 
 def mixed_canonical_full_core_truncation_only(data_tensor, core_bond_dimension, batch_size_position):
     """
-    Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
-    Only truncation of the core tensor bonds is performed
+    Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor, in which only truncation of the
+    core tensor bonds is performed.
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the mixed canonical form of a matrix product state.
+
+    In this implementation:
+        - Truncation of _only_ the bonds of the core tensor is performed according to specified max_bond_dimension
+        - The mixed canonical MPS is returned via a list of left canonical tensors, a list of right canonical tensors
+        and a core tensor
+        - No singular values are returned
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param core_bond_dimension: The bond dimension of the output core tensor.
@@ -710,9 +804,17 @@ def mixed_canonical_full_core_truncation_only(data_tensor, core_bond_dimension, 
 
 def mixed_canonical_full_core_truncation_only_ret_sv(data_tensor, core_bond_dimension, batch_size_position):
     """
-    Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor.
-    Only truncation of the core tensor bonds is performed.
-    Also provides the singular values (both retained and full) from the decomposition procedure.
+    Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor, in which only truncation of the
+    core tensor bonds is performed.
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the mixed canonical form of a matrix product state.
+
+    In this implementation:
+        - Truncation of _only_ the bonds of the core tensor is performed according to specified max_bond_dimension
+        - The mixed canonical MPS is returned via a list of left canonical tensors, a list of right canonical tensors
+        and a core tensor
+        - A full list of singular values per bond, both before and after truncation, is returned.
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param core_bond_dimension: The bond dimension of the output core tensor.
@@ -844,8 +946,16 @@ def mixed_canonical_full_core_truncation_only_ret_sv(data_tensor, core_bond_dime
 
 def mixed_canonical_core_only_core_truncation_only(data_tensor, core_bond_dimension, batch_size_position):
     """
-    Performs a mixed canonical MPS decomposition of a pre-partitioned data tensor, and only stores the core tensor.
-    Only the bonds directly attached to the core tensor are truncated.
+    Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor, in which only truncation of the
+    core tensor bonds is performed.
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the mixed canonical form of a matrix product state.
+
+    In this implementation:
+        - Truncation of _only_ the bonds of the core tensor is performed according to specified max_bond_dimension
+        - Only the core tensor of the mixed canonical MPS is returned
+        - No singular values are returned
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param core_bond_dimension: The bond dimension of the output core tensor.
@@ -931,8 +1041,16 @@ def mixed_canonical_core_only_core_truncation_only(data_tensor, core_bond_dimens
 
 def mixed_canonical_core_only_core_truncation_only_ret_sv(data_tensor, core_bond_dimension, batch_size_position):
     """
-    Performs a mixed canonical MPS decomposition of a pre-partitioned data tensor, and only stores the core tensor.
-    Only the bonds directly attached to the core tensor are truncated.
+    Performs a full mixed canonical MPS decomposition of a pre-partitioned data tensor, in which only truncation of the
+    core tensor bonds is performed.
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the mixed canonical form of a matrix product state.
+
+    In this implementation:
+        - Truncation of _only_ the bonds of the core tensor is performed according to specified max_bond_dimension
+        - Only the core tensor of the mixed canonical MPS is returned
+        - A full list of singular values per bond, both before and after truncation, is returned.
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param core_bond_dimension: The bond dimension of the output core tensor.
@@ -1037,9 +1155,14 @@ def mixed_canonical_core_only_core_truncation_only_ret_sv(data_tensor, core_bond
 
 def core_compression(data_matrix, maximum_bond_dimension):
     """
-    Performs dimensionality reduction by extracting the core of a mixed canonical representation of the data tensor.
-    In this implementation the data tensor is partitioned via the longest possible prime partition.
-    The new representation has maximum_bond_dimension^2 number of features.
+    Performs dimensionality reduction of the data matrix via the following methodology:
+
+        1. The data matrix is tensorized via the maximum length symmetric partition/factorization, with the
+        batch index centred.
+        2. A full mixed canonical decomposition of the tensorized data matrix is performed, with truncation of _all_
+        bonds performed via the specified maximum bond_dimension.
+        3. The core tensor of the MPS is returned as a numpy array. This array has the same number of rows as the
+        original data matrix, but fewer columns, which now contain the extracted features.
 
     :param data_matrix: A data array with rows as instances and columns as features
     :param maximum_bond_dimension: The maximum bond dimension of the output MPS.
@@ -1069,10 +1192,14 @@ def core_compression(data_matrix, maximum_bond_dimension):
 
 def core_compression_core_truncation_only(data_matrix, maximum_bond_dimension):
     """
-    Performs dimensionality reduction by extracting the core of a mixed canonical representation of the data tensor.
-    In this implementation the data tensor is partitioned via the longest possible prime partition.
-    The new representation has at most maximum_bond_dimension^2 number of features.
-    This "core truncation only" version of "core_compression" truncates only the bonds attached to the core tensor
+    Performs dimensionality reduction of the data matrix via the following methodology:
+
+        1. The data matrix is tensorized via the maximum length symmetric partition/factorization, with the
+        batch index centred.
+        2. A full mixed canonical decomposition of the tensorized data matrix is performed, with truncation of _only_
+        the core tensor bonds performed via the specified maximum_bond_dimension.
+        3. The core tensor of the MPS is returned as a numpy array. This array has the same number of rows as the
+        original data matrix, but fewer columns, which now contain the extracted features.
 
     :param data_matrix: A data array with rows as instances and columns as features
     :param maximum_bond_dimension: The  bond dimension of the output core tensor.
@@ -1105,10 +1232,14 @@ def core_compression_core_truncation_only(data_matrix, maximum_bond_dimension):
 def core_compression_core_truncation_only_with_partition(data_matrix, maximum_bond_dimension, feature_partition,
                                                          batch_size_position):
     """
-    Performs dimensionality reduction by extracting the core of a mixed canonical representation of the data tensor.
-    In this implementation one has to supply the partition. NB: This has to be a factorization of num_features!
-    The new representation has at most maximum_bond_dimension^2 number of features.
-    This "core truncation only" version of "core_compression" truncates only the bonds attached to the core tensor
+    Performs dimensionality reduction of the data matrix via the following methodology:
+
+        1. The data matrix is tensorized via the partition/factorization provided, with the batch_size_index
+        placed as specified by the batch_size_position parameter.
+        2. A full mixed canonical decomposition of the tensorized data matrix is performed, with truncation of _only_
+        the core tensor bonds performed via the specified maximum_bond_dimension.
+        3. The core tensor of the MPS is returned as a numpy array. This array has the same number of rows as the
+        original data matrix, but fewer columns, which now contain the extracted features.
 
     :param data_matrix: A data array with rows as instances and columns as features
     :param maximum_bond_dimension: The  bond dimension of the output core tensor.
@@ -1138,9 +1269,14 @@ def core_compression_core_truncation_only_with_partition(data_matrix, maximum_bo
 
 def core_compression_with_partition(data_matrix, maximum_bond_dimension, feature_partition, batch_size_position):
     """
-    Performs dimensionality reduction by extracting the core of a mixed canonical representation of the data tensor.
-    In this implementation one has to supply the partition. NB: This has to be a factorization of num_features!
-    The new representation has at most maximum_bond_dimension^2 number of features.
+    Performs dimensionality reduction of the data matrix via the following methodology:
+
+        1. The data matrix is tensorized via the partition/factorization provided, with the batch_size_index
+        placed as specified by the batch_size_position parameter.
+        2. A full mixed canonical decomposition of the tensorized data matrix is performed, with truncation of _all_
+        bonds performed via the specified maximum_bond_dimension.
+        3. The core tensor of the MPS is returned as a numpy array. This array has the same number of rows as the
+        original data matrix, but fewer columns, which now contain the extracted features.
 
 
     :param data_matrix: A data array with rows as instances and columns as features
@@ -1169,7 +1305,15 @@ def core_compression_with_partition(data_matrix, maximum_bond_dimension, feature
 
 def left_canonical_decompose_no_diagnostics(data_tensor, max_bond_dimension):
     """
-    Performs a full left canonical MPS decomposition of a pre-partitioned data tensor.
+    Performs a full left canonical MPS (Matrix Product State) decomposition of a pre-partitioned data tensor.
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the canonical forms of matrix product states.
+
+    In this implementation:
+        - Truncation of all bonds is performed via the specified max_bond_dimension.
+        - The left canonical MPS is returned via a list of left canonical tensors.
+        - No singular values are returned.
 
     :param data_tensor: The multi-dimensional (tncontract) tensor to be decomposed.
     :param max_bond_dimension: The maximum bond dimension of the output MPS.
@@ -1216,7 +1360,18 @@ def left_canonical_decompose_no_diagnostics(data_tensor, max_bond_dimension):
 
 def single_vector_individual_left_canonical_mps_compression(feature_vector, partition, labels, max_bond_dimension):
     """
-    Performs a full left canonical MPS decomposition of a vector.
+    Performs a full left canonical MPS (Matrix Product State) decomposition of an individual feature vector.
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the canonical forms of matrix product states.
+
+    In this implementation:
+        - The feature vector is tensorized via the provided partition/factorization.
+        - Truncation of all bonds is performed via the specified max_bond_dimension.
+        - The left canonical MPS is returned via a list of left canonical tensors.
+        - No singular values are returned.
+
+    The outcome of this procedure could for instance be used as the input to a tensorized neural network.
 
     :param feature_vector: The vector to be decomposed.
     :param partition: The partition according to which the decompostion should be performed.
@@ -1234,7 +1389,16 @@ def single_vector_individual_left_canonical_mps_compression(feature_vector, part
 def single_vector_individual_left_canonical_mps_compression_with_reconstruction(feature_vector, partition, labels,
                                                                                 max_bond_dimension):
     """
-    Performs a full left canonical MPS decomposition of a vector, and then reconstructs a vector from the MPS.
+    Performs a full left canonical MPS decomposition of a vector, and then reconstructs a vector from the MPS. This
+    allows one to diagnosis and analyze the compression provided by the decomposition.
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the canonical forms of matrix product states.
+
+    In this implementation:
+        - The feature vector is compressed via single_vector_individual_left_canonical_mps_compression
+        - A vector of the original dimensions is then reconstructed from the left canonical MPS
+
 
     :param feature_vector: The vector to be decomposed.
     :param partition: The partition according to which the decompostion should be performed.
@@ -1253,8 +1417,16 @@ def single_vector_individual_left_canonical_mps_compression_with_reconstruction(
 
 def full_dataset_individual_left_canonical_mps_compression_with_reconstruction(all_data, partition, max_bond_dimension):
     """
-    Performs a full left canonical MPS decomposition, and subsequent vector reconstruction,
-     of every vector within a dataset.
+    Performs a full left canonical MPS decomposition, and subsequent vector reconstruction, of every vector within a
+    dataset (i.e. every row in a matrix)
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the canonical forms of matrix product states.
+
+    In this implementation:
+        - each feature vector is compressed via single_vector_individual_left_canonical_mps_compression
+        - each feature tensor is the reconstructed into a feature  vector of the original dimensions
+
 
     :param all_data: A matrix with each row a different instance/vector of feature values
     :param partition: The partition according to which the decomposition should be performed.
@@ -1277,7 +1449,13 @@ def full_dataset_individual_left_canonical_mps_compression_with_reconstruction(a
 
 def full_dataset_individual_left_canonical_mps_compression(all_data, partition, max_bond_dimension):
     """
-    Performs a full left canonical MPS decomposition of every vector within a dataset.
+    Performs a full left canonical MPS decomposition of every vector within a dataset (i.e. every row in a matrix)
+
+    See "The density matrix renormalization group in the age of Matrix Product States" (https://arxiv.org/abs/1008.3477)
+    pages 43-55 for algorithm details, and a discussion of the canonical forms of matrix product states.
+
+    In this implementation:
+        - each feature vector (row) is compressed via single_vector_individual_left_canonical_mps_compression
 
     :param all_data: A matrix with each row a different instance/vector of feature values
     :param partition: The partition according to which the decomposition should be performed.
