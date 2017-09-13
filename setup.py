@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='tanalysis',
-      version='0.1',
+      version='1.0',
       description='Data analysis and transformation via tensor network decompositions',
       author='Ryan Sweke',
       author_email='rsweke@gmail.com',
