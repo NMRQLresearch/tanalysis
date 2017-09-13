@@ -5,9 +5,18 @@ from .reconstructions import *
 
 def extract_core_tensor_via_common_features(data_tensor, left_features, right_features):
     """
-    Performs dimensionality reduction of the data (pre tensorized) by extracting a core-tensor via pre-existing
-    left and right features.
-    These pre-existing features are usually obtained by a mixed canonical decomposition of training data
+    Perform dimensionality reduction of the pre-tensorized data_tensor by contraction with pre-exisiting left
+    and right features. This is normally used to extract features from test or out-of-sample data given a mixed
+    canonical mps decomposition of the training data (where the left and right features are tensor obtained
+    from the left and right canonical parts of the MPS respectively)
+
+    See "Optimal Feature Extraction and Classification of Tensors via Matrix Product State Decomposition"
+    (https://arxiv.org/abs/1503.00516v2) for details of the algorithm.
+
+    Note: In this implementation the tensorization of the data_tensor _must_ match the tensorization of the
+    pre-existing MPS. It is preferable rather use "extract_core_tensor_via_common_features_from_matrix" which
+    automatically takes care of the tensorization of the data from which the features should be extracted (i.e
+    ensures matching of the partition with the pre-existing MPS)
 
     :param data_tensor: The tensorized data that we want to be reduced via MCA. The partition must match the MCS.
     :param left_features: The list of left tensors from the previously obtained mixed canonical state
@@ -49,6 +58,17 @@ def extract_core_tensor_via_common_features_from_matrix(data_matrix, left, right
     These pre-existing features are usually obtained by a mixed canonical decomposition of training data
     This version ensures that the partitioning of the test data matches up accordingly
     ---> it is preferable to use this over "extract_core_tensor_via_common_features"
+
+    Perform dimensionality reduction of the data matrix by tensorization ad contraction with pre-exisiting left
+    and right features. This is normally used to extract features from test or out-of-sample data given a mixed
+    canonical mps decomposition of the training data (where the left and right features are tensor obtained
+    from the left and right canonical parts of the MPS respectively)
+
+    See "Optimal Feature Extraction and Classification of Tensors via Matrix Product State Decomposition"
+    (https://arxiv.org/abs/1503.00516v2) for details of the algorithm.
+
+    Note: In this implementation the tensorization of the data_tensor is performed automatically to match the
+    tensorization of the pre-existing mixed canonical MPS.
 
     :param data_matrix: The data matrix whose features we want extracted. Partition is extracted automatically.
     :param left: The list of left tensors from the previously obtained mixed canonical state

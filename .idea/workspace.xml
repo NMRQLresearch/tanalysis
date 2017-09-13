@@ -3,7 +3,9 @@
   <component name="ChangeListManager">
     <list default="true" id="30f9fd4c-3b81-462c-aa36-3d830bb53f42" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/tanalysis/decompositions.py" afterPath="$PROJECT_DIR$/tanalysis/decompositions.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/tanalysis/multi_component_analysis.py" afterPath="$PROJECT_DIR$/tanalysis/multi_component_analysis.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/tanalysis/partitioning.py" afterPath="$PROJECT_DIR$/tanalysis/partitioning.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/tanalysis/reconstructions.py" afterPath="$PROJECT_DIR$/tanalysis/reconstructions.py" />
     </list>
     <ignored path="tanalysis.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -43,24 +45,44 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="multi_component_analysis.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="multi_component_analysis.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/tanalysis/multi_component_analysis.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="90">
-              <caret line="8" column="28" selection-start-line="8" selection-start-column="28" selection-end-line="8" selection-end-column="28" />
+            <state relative-caret-position="1020">
+              <caret line="70" column="9" selection-start-line="70" selection-start-column="9" selection-end-line="70" selection-end-column="9" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="decompositions.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="decompositions.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/tanalysis/decompositions.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="14313">
-              <caret line="1457" column="109" selection-start-line="1457" selection-start-column="109" selection-end-line="1457" selection-end-column="109" />
+            <state relative-caret-position="-6552">
+              <caret line="536" column="49" selection-start-line="536" selection-start-column="49" selection-end-line="536" selection-end-column="49" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="reconstructions.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/tanalysis/reconstructions.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="525">
+              <caret line="36" column="77" selection-start-line="36" selection-start-column="77" selection-end-line="36" selection-end-column="77" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="partitioning.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/tanalysis/partitioning.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="885">
+              <caret line="61" column="46" selection-start-line="61" selection-start-column="46" selection-end-line="61" selection-end-column="46" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -81,11 +103,11 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/tanalysis/__init__.py" />
-        <option value="$PROJECT_DIR$/tanalysis/multi_component_analysis.py" />
-        <option value="$PROJECT_DIR$/tanalysis/reconstructions.py" />
-        <option value="$PROJECT_DIR$/tanalysis/partitioning.py" />
         <option value="$PROJECT_DIR$/tanalysis/tests/unit_tests.py" />
         <option value="$PROJECT_DIR$/tanalysis/decompositions.py" />
+        <option value="$PROJECT_DIR$/tanalysis/reconstructions.py" />
+        <option value="$PROJECT_DIR$/tanalysis/partitioning.py" />
+        <option value="$PROJECT_DIR$/tanalysis/multi_component_analysis.py" />
       </list>
     </option>
   </component>
@@ -872,32 +894,10 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/ExampleUsage.py" />
-    <entry file="file://$PROJECT_DIR$/tanalysis/partitioning.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1440">
-          <caret line="98" column="0" selection-start-line="98" selection-start-column="0" selection-end-line="98" selection-end-column="0" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/tanalysis/reconstructions.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1080">
-          <caret line="73" column="78" selection-start-line="73" selection-start-column="78" selection-end-line="73" selection-end-column="78" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/tanalysis/__init__.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="45">
           <caret line="3" column="30" selection-start-line="3" selection-start-column="30" selection-end-line="3" selection-end-column="30" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/tanalysis/multi_component_analysis.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="90">
-          <caret line="8" column="28" selection-start-line="8" selection-start-column="28" selection-end-line="8" selection-end-column="28" />
           <folding />
         </state>
       </provider>
@@ -910,13 +910,37 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/tanalysis/reconstructions.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="525">
+          <caret line="36" column="77" selection-start-line="36" selection-start-column="77" selection-end-line="36" selection-end-column="77" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tanalysis/partitioning.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="885">
+          <caret line="61" column="46" selection-start-line="61" selection-start-column="46" selection-end-line="61" selection-end-column="46" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/tanalysis/decompositions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="14313">
-          <caret line="1457" column="109" selection-start-line="1457" selection-start-column="109" selection-end-line="1457" selection-end-column="109" />
+        <state relative-caret-position="-6552">
+          <caret line="536" column="49" selection-start-line="536" selection-start-column="49" selection-end-line="536" selection-end-column="49" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tanalysis/multi_component_analysis.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1020">
+          <caret line="70" column="9" selection-start-line="70" selection-start-column="9" selection-end-line="70" selection-end-column="9" />
+          <folding />
         </state>
       </provider>
     </entry>

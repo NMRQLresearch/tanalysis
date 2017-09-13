@@ -2,13 +2,14 @@ import numpy as np
 from sympy import factorint
 import tncontract as tn
 
+
 def raw_partition(N):
     """
-    Generates the longest possible product-partition of N.
-    i.e. the longest list of prime numbers partition such that prod(partition) = N
+    Generates the longest possible product-partition (i.e. factorization) of N.
+    i.e. the longest list of prime numbers "partition" such that prod(partition) = N
 
-    :param N: A postive integer.
-    :return partition: The longest prime product-partition of N (A list of prime numbers).
+    :param N: A positive integer.
+    :return partition: The longest prime product-partition (i.e. factorization) of N (A list of prime numbers).
     """
     factor_dict = factorint(N)
     partition = []
@@ -21,7 +22,7 @@ def raw_partition(N):
 
 def symmetrize(partition):
     """
-    Symmetrizes a given partition.
+    Symmetrizes a given partition/factorization.
     i.e. permute the partition such that if plotted the resulting shape would be pyramidal.
 
     :param partition: A list of integers.
@@ -44,7 +45,7 @@ def symmetrize(partition):
 
     return sym_partition
 
-def create_random_permutations(partition,N):
+def create_random_permutations(partition, N):
     """
     Creates a list of N random permutations of the partition
 
@@ -58,7 +59,7 @@ def create_random_permutations(partition,N):
 
 def compress_partition(partition, steps, step_size, sym=True):
     """
-    Compresses a given partition.
+    Compresses a given partition/factorization.
     Compresses from the outside in, by using a given number of steps, of a certain step size.
     Each step multiplies together "step_size" entries of the partition to create a new entry.
     If the partition cannot be compressed as requested, then the original partition is returned and a flag is raised.

@@ -34,7 +34,7 @@ def mixed_consolidate(left, right, core):
 def reconstruct_to_tensor(mps):
 
     """
-    Reconstructs a multi-dimensional tensor from a MPS.
+    Reconstructs a multi-dimensional tensor from an MPS (matrix product state).
 
     :param mps: A matrix product state.
     :return tensor_form: the high dimensional tensor corresponding to the MPS.
